@@ -22,29 +22,41 @@ Otter Delivery is a desktop MVP frontend for an AI-first, multilingual food disc
 - Tailwind CSS
 - React Router
 
+## Repository Structure
+
+```txt
+frontend/   React + Vite + Tailwind desktop MVP
+backend/    Polyglot backend service skeletons
+docs/       Architecture and API documentation
+```
+
 ## Getting Started
 
 Install dependencies:
 
 ```bash
+cd frontend
 npm install
 ```
 
 Run the development server:
 
 ```bash
+cd frontend
 npm run dev
 ```
 
 Build for production:
 
 ```bash
+cd frontend
 npm run build
 ```
 
 Preview the production build:
 
 ```bash
+cd frontend
 npm run preview
 ```
 
@@ -93,29 +105,41 @@ Otter Delivery 是一个桌面端 MVP 前端项目，面向 AI-first、多语言
 - Tailwind CSS
 - React Router
 
+## 仓库结构
+
+```txt
+frontend/   React + Vite + Tailwind 桌面端 MVP
+backend/    多语言后端服务骨架
+docs/       架构与 API 文档
+```
+
 ## 本地运行
 
 安装依赖：
 
 ```bash
+cd frontend
 npm install
 ```
 
 启动开发服务器：
 
 ```bash
+cd frontend
 npm run dev
 ```
 
 生产构建：
 
 ```bash
+cd frontend
 npm run build
 ```
 
 预览生产构建：
 
 ```bash
+cd frontend
 npm run preview
 ```
 

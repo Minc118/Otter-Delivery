@@ -1,0 +1,62 @@
+services:
+  frontend:
+    image: node:20-alpine
+    working_dir: /app/frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app/frontend
+      - frontend_node_modules:/app/frontend/node_modules
+    environment:
+      VITE_DRIVER_API_URL: http://localhost:${DRIVER_SERVICE_PORT:-8003}
+      VITE_RECOMMENDATION_API_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
+    depends_on:
+      - driver-service
+      - recommendation-service
+
+  driver-service:
+    build:
+      context: ./backend/driver-service
+    ports:
+      - "${DRIVER_SERVICE_PORT:-8003}:8003"
+    environment:
+      PORT: 8003
+      ETA_MINUTES: 40
+
+  recommendation-service:
+    build:
+      context: ./backend/recommendation-service
+    ports:
+      - "${RECOMMENDATION_SERVICE_PORT:-8004}:8004"
+    environment:
+      PORT: 8004
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RESTAURANT_SERVICE_URL: ${RESTAURANT_SERVICE_URL:-http://restaurant-service:8001}
+
+  # Placeholder teammate services, not implemented yet:
+  # restaurant-service:
+  #   build:
+  #     context: ./backend/restaurant-service
+  #   ports:
+  #     - "8001:8001"
+  #
+  # order-service:
+  #   build:
+  #     context: ./backend/order-service
+  #   ports:
+  #     - "8002:8002"
+  #
+  # translation-service:
+  #   build:
+  #     context: ./backend/translation-service
+  #   ports:
+  #     - "8005:8005"
+  #
+  # auth-service:
+  #   image: quay.io/keycloak/keycloak:latest
+  #   ports:
+  #     - "8080:8080"
+
+volumes:
+  frontend_node_modules:
