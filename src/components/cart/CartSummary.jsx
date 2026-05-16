@@ -3,7 +3,7 @@ import { formatCurrency } from "../../utils/currency.js";
 
 export default function CartSummary({
   deliveryFeeCents,
-  onPlaceOrder,
+  onCheckout,
   selectedGroup,
 }) {
   if (!selectedGroup) {
@@ -34,10 +34,10 @@ export default function CartSummary({
       </div>
       <button
         className="w-full bg-primary-container hover:bg-surface-tint text-on-primary font-button text-button py-4 rounded-xl transition-colors duration-200 mt-2 shadow-sm flex justify-center items-center gap-2"
-        onClick={onPlaceOrder}
+        onClick={onCheckout}
         type="button"
       >
-        Place Order
+        Checkout selected restaurant
         <span className="material-symbols-outlined text-[20px]">
           arrow_forward
         </span>

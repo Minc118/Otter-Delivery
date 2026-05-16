@@ -7,7 +7,9 @@ import { CartProvider } from "./context/CartContext.jsx";
 import useCart from "./hooks/useCart.js";
 import HomePage from "./routes/HomePage.jsx";
 import LoginPage from "./routes/LoginPage.jsx";
+import OrderConfirmationPage from "./routes/OrderConfirmationPage.jsx";
 import OrderHistoryPage from "./routes/OrderHistoryPage.jsx";
+import OrderSuccessPage from "./routes/OrderSuccessPage.jsx";
 import OrderTrackingPage from "./routes/OrderTrackingPage.jsx";
 import ProfilePage from "./routes/ProfilePage.jsx";
 import RankingPage from "./routes/RankingPage.jsx";
@@ -48,6 +50,8 @@ function AppLayout() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/orders" element={<OrderHistoryPage />} />
           <Route path="/profile/saved" element={<SavedRestaurantsPage />} />
+          <Route path="/orders/confirm" element={<OrderConfirmationPage />} />
+          <Route path="/orders/:id/success" element={<OrderSuccessPage />} />
           <Route path="/restaurants" element={<RestaurantDiscoveryPage />} />
           <Route path="/rankings" element={<RankingPage />} />
           <Route path="/restaurants/:id" element={<RestaurantDetailPage />} />

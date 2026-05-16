@@ -9,7 +9,7 @@ Otter Delivery is a desktop MVP frontend for an AI-first, multilingual food disc
 - Rethink Sans global typography
 - Stitch-inspired visual style with near-white surfaces, teal-green primary color, warm yellow accents, rounded cards, soft borders, and subtle shadows
 - Homepage with AI-style food discovery search
-- Restaurant discovery, rankings, restaurant detail, cart drawer, order tracking, profile, saved restaurants, and order history pages
+- Restaurant discovery, rankings, restaurant detail, cart drawer, order confirmation, order success, order tracking, profile, saved restaurants, and order history pages
 - Restaurant-grouped cart with quantity controls and per-restaurant checkout summary
 - Profile settings for language, translation, dietary preferences, notifications, and account preferences
 - Mock data separated from components
@@ -80,7 +80,7 @@ Otter Delivery 是一个桌面端 MVP 前端项目，面向 AI-first、多语言
 - 全局使用 Rethink Sans 字体
 - 保留 Stitch 风格：近白背景、青绿色主色、暖黄色强调、圆角卡片、柔和边框和轻阴影
 - 首页 AI 风格美食发现搜索
-- 餐厅发现、排行榜、餐厅详情、购物车抽屉、订单追踪、个人资料、收藏餐厅和订单历史页面
+- 餐厅发现、排行榜、餐厅详情、购物车抽屉、订单确认、下单成功、订单追踪、个人资料、收藏餐厅和订单历史页面
 - 按餐厅分组的购物车，支持数量调整和单餐厅结算摘要
 - 个人资料中支持语言、翻译、饮食偏好、通知和账号偏好设置
 - mock data 与组件分离

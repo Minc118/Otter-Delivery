@@ -4,11 +4,17 @@ import DeliveryMap from "../components/order/DeliveryMap.jsx";
 import OrderSummary from "../components/order/OrderSummary.jsx";
 import SupportCard from "../components/order/SupportCard.jsx";
 import TrackingStatusHeader from "../components/order/TrackingStatusHeader.jsx";
+import useCart from "../hooks/useCart.js";
 import { getOrderById } from "../services/orderService.js";
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
-  const order = getOrderById(id);
+  const { lastPlacedOrder } = useCart();
+  const order = getTrackingOrder({
+    fallbackOrder: getOrderById(id),
+    id,
+    lastPlacedOrder,
+  });
 
   useEffect(() => {
     document.title = "Order Tracking - Otter Delivery";
@@ -29,4 +35,23 @@ export default function OrderTrackingPage() {
       </div>
     </div>
   );
+}
+
+function getTrackingOrder({ fallbackOrder, id, lastPlacedOrder }) {
+  if (lastPlacedOrder?.id !== id) {
+    return fallbackOrder;
+  }
+
+  return {
+    ...fallbackOrder,
+    id: lastPlacedOrder.id,
+    displayId: lastPlacedOrder.displayId,
+    restaurant: {
+      name: lastPlacedOrder.restaurantName,
+      image: lastPlacedOrder.restaurantImage,
+    },
+    items: lastPlacedOrder.items,
+    deliveryFeeCents: lastPlacedOrder.deliveryFeeCents,
+    serviceFeeCents: 0,
+  };
 }

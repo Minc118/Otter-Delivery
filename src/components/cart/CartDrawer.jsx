@@ -1,11 +1,14 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import useCart from "../../hooks/useCart.js";
 import EmptyState from "../ui/EmptyState.jsx";
 import CartRestaurantGroup from "./CartRestaurantGroup.jsx";
 import CartSummary from "./CartSummary.jsx";
 
 export default function CartDrawer({ isOpen, onClose }) {
+  const navigate = useNavigate();
   const {
+    beginCheckout,
     cartGroups,
     decrementItem,
     deliveryFeeCents,
@@ -90,9 +93,10 @@ export default function CartDrawer({ isOpen, onClose }) {
         {selectedGroup ? (
           <CartSummary
             deliveryFeeCents={deliveryFeeCents}
-            onPlaceOrder={() => {
-              removeRestaurant(selectedGroup.restaurantId);
+            onCheckout={() => {
+              beginCheckout();
               onClose();
+              navigate("/orders/confirm");
             }}
             selectedGroup={selectedGroup}
           />

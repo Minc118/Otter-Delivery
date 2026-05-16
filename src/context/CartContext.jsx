@@ -1,5 +1,9 @@
 import { createContext, useMemo, useState } from "react";
 import {
+  cloneCartGroup,
+  createMockPlacedOrder,
+} from "../services/checkoutService.js";
+import {
   getDeliveryFeeCents,
   getInitialCartGroups,
 } from "../services/cartService.js";
@@ -12,6 +16,10 @@ export function CartProvider({ children }) {
   const initialCartGroups = getInitialCartGroups();
   const deliveryFeeCents = getDeliveryFeeCents();
   const [cartGroups, setCartGroups] = useState(initialCartGroups);
+  const [checkoutDraft, setCheckoutDraft] = useState(
+    cloneCartGroup(initialCartGroups[0]),
+  );
+  const [lastPlacedOrder, setLastPlacedOrder] = useState(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(
     initialCartGroups[0]?.restaurantId ?? null,
   );
@@ -27,6 +35,13 @@ export function CartProvider({ children }) {
 
   function selectRestaurant(restaurantId) {
     setSelectedRestaurantId(restaurantId);
+  }
+
+  function beginCheckout() {
+    const draft = cloneCartGroup(selectedGroup);
+    setCheckoutDraft(draft);
+
+    return draft;
   }
 
   function removeEmptyGroups(groups) {
@@ -183,14 +198,38 @@ export function CartProvider({ children }) {
     );
   }
 
+  function placeCheckoutOrder(paymentMethod) {
+    const group = checkoutDraft ?? selectedGroup;
+
+    if (!group) {
+      return null;
+    }
+
+    const placedOrder = createMockPlacedOrder({
+      deliveryFeeCents,
+      group,
+      paymentMethod,
+    });
+
+    setLastPlacedOrder(placedOrder);
+    setCheckoutDraft(null);
+    removeRestaurant(group.restaurantId);
+
+    return placedOrder;
+  }
+
   const value = useMemo(
     () => ({
       addItem,
+      beginCheckout,
       cartGroups,
+      checkoutDraft,
       decrementItem,
       deliveryFeeCents,
       incrementItem,
       itemCount,
+      lastPlacedOrder,
+      placeCheckoutOrder,
       removeItem,
       removeRestaurant,
       restaurantCount: cartGroups.length,
@@ -199,7 +238,7 @@ export function CartProvider({ children }) {
       selectRestaurant,
       updateItemQuantity,
     }),
-    [cartGroups, itemCount, selectedGroup],
+    [cartGroups, checkoutDraft, itemCount, lastPlacedOrder, selectedGroup],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
