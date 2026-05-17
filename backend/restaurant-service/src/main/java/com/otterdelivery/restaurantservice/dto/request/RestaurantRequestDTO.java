@@ -1,5 +1,6 @@
 package com.otterdelivery.restaurantservice.dto.request;
 
+import com.otterdelivery.restaurantservice.dto.response.AddressDTO;
 import jakarta.validation.constraints.*;
 import java.time.LocalTime;
 
@@ -28,11 +29,13 @@ public class RestaurantRequestDTO {
     @NotNull
     private LocalTime closingTime;
 
+    @NotNull
+    private AddressDTO address;
 
     public RestaurantRequestDTO() {}
 
     public RestaurantRequestDTO(String name, String description, String phoneNumber, String email, boolean open,
-                                double deliveryRadiusKm, LocalTime openingTime, LocalTime closingTime) {
+                                double deliveryRadiusKm, LocalTime openingTime, LocalTime closingTime, AddressDTO address) {
         this.name = name;
         this.description = description;
         this.phoneNumber = phoneNumber;
@@ -41,6 +44,7 @@ public class RestaurantRequestDTO {
         this.deliveryRadiusKm = deliveryRadiusKm;
         this.openingTime = openingTime;
         this.closingTime = closingTime;
+        this.address= address;
     }
 
 
@@ -106,5 +110,11 @@ public class RestaurantRequestDTO {
 
     public void setClosingTime(LocalTime closingTime) {
         this.closingTime = closingTime;
+    }
+    public AddressDTO getAddress(){
+        return address;
+    }
+    public void setAddress(AddressDTO address){
+        this.address=address;
     }
 }

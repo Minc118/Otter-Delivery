@@ -58,6 +58,19 @@ public class RestaurantMapper {
         restaurant.setDeliveryRadiusKm(requestDTO.getDeliveryRadiusKm());
         restaurant.setOpeningTime(requestDTO.getOpeningTime());
         restaurant.setClosingTime(requestDTO.getClosingTime());
+
+
+        if (requestDTO.getAddress() != null) {
+            Address address = new Address();
+            address.setStreet(requestDTO.getAddress().getStreet());
+            address.setCity(requestDTO.getAddress().getCity());
+            address.setPostalCode(requestDTO.getAddress().getPostalCode());
+            address.setCountry(requestDTO.getAddress().getCountry());
+            address.setLatitude(requestDTO.getAddress().getLatitude());
+            address.setLongitude(requestDTO.getAddress().getLongitude());
+
+            restaurant.setAddress(address);
+        }
         return restaurant;
     }
 }
