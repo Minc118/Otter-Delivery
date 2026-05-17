@@ -2,8 +2,10 @@ package com.otterdelivery.restaurantservice.dto.request;
 
 import com.otterdelivery.restaurantservice.dto.response.AddressDTO;
 import jakarta.validation.constraints.*;
-import java.time.LocalTime;
+import lombok.Data;
 
+import java.time.LocalTime;
+@Data
 public class RestaurantRequestDTO {
 
     @NotBlank
@@ -47,74 +49,4 @@ public class RestaurantRequestDTO {
         this.address= address;
     }
 
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public boolean isOpen() {
-        return open;
-    }
-
-    public void setOpen(boolean open) {
-        this.open = open;
-    }
-
-    public double getDeliveryRadiusKm() {
-        return deliveryRadiusKm;
-    }
-
-    public void setDeliveryRadiusKm(double deliveryRadiusKm) {
-        this.deliveryRadiusKm = deliveryRadiusKm;
-    }
-
-    public LocalTime getOpeningTime() {
-        return openingTime;
-    }
-
-    public void setOpeningTime(LocalTime openingTime) {
-        this.openingTime = openingTime;
-    }
-
-    public LocalTime getClosingTime() {
-        return closingTime;
-    }
-
-    public void setClosingTime(LocalTime closingTime) {
-        this.closingTime = closingTime;
-    }
-    public AddressDTO getAddress(){
-        return address;
-    }
-    public void setAddress(AddressDTO address){
-        this.address=address;
-    }
 }

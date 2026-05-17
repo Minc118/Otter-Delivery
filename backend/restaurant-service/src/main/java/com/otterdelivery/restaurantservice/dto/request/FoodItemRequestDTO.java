@@ -3,9 +3,10 @@ package com.otterdelivery.restaurantservice.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Data;
 
 import java.math.BigDecimal;
-
+@Data
 public class FoodItemRequestDTO {
 
     @NotBlank
@@ -38,51 +39,5 @@ public class FoodItemRequestDTO {
     }
 
 
-    public String getName() {
-        return name;
-    }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public BigDecimal getPrice() {
-        return price;
-    }
-
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
-
-    public boolean isAvailable() {
-        return available;
-    }
-
-    public void setAvailable(boolean available) {
-        this.available = available;
-    }
-
-    public int getPreparationTimeMinutes() {
-        return preparationTimeMinutes;
-    }
-
-    public void setPreparationTimeMinutes(int preparationTimeMinutes) {
-        this.preparationTimeMinutes = preparationTimeMinutes;
-    }
-
-    public String getImageUrl() {
-        return imageUrl;
-    }
-
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
 }
