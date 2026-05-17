@@ -22,7 +22,7 @@ public class CategoryController {
 
     @PostMapping("/restaurants/{restaurantId}")
     public ResponseEntity<CategoryResponseDTO> createCategory(
-            @PathVariable Long restaurantId,
+            @PathVariable("restaurantId") Long restaurantId,
             @Valid @RequestBody CategoryRequestDTO categoryRequestDTO) {
         CategoryResponseDTO createdCategory = categoryService.createCategory(restaurantId, categoryRequestDTO);
         return ResponseEntity.ok(createdCategory);
