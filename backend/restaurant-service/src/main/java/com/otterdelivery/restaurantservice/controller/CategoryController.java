@@ -29,21 +29,21 @@ public class CategoryController {
     }
 
     @GetMapping("/restaurants/{restaurantId}")
-    public ResponseEntity<List<CategoryResponseDTO>> getCategoriesByRestaurant(@PathVariable Long restaurantId) {
+    public ResponseEntity<List<CategoryResponseDTO>> getCategoriesByRestaurant(@PathVariable("restaurantId") Long restaurantId) {
         List<CategoryResponseDTO> categories = categoryService.getCategoriesByRestaurant(restaurantId);
         return ResponseEntity.ok(categories);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponseDTO> updateCategory(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody CategoryRequestDTO categoryRequestDTO) {
         CategoryResponseDTO updatedCategory = categoryService.updateCategory(id, categoryRequestDTO);
         return ResponseEntity.ok(updatedCategory);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCategory(@PathVariable("id") Long id) {
         categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }
