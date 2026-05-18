@@ -22,7 +22,11 @@ services:
       - "${DRIVER_SERVICE_PORT:-8003}:8003"
     environment:
       PORT: 8003
+      DRIVER_DATABASE_URL: ${DRIVER_DATABASE_URL:-}
+      DATABASE_URL: ${DATABASE_URL:-}
       ETA_MINUTES: 40
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GOOGLE_ROUTES_API_KEY: ${GOOGLE_ROUTES_API_KEY:-}
 
   recommendation-service:
     build:
@@ -31,7 +35,9 @@ services:
       - "${RECOMMENDATION_SERVICE_PORT:-8004}:8004"
     environment:
       PORT: 8004
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RECOMMENDATION_DATABASE_URL: ${RECOMMENDATION_DATABASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       RESTAURANT_SERVICE_URL: ${RESTAURANT_SERVICE_URL:-http://restaurant-service:8001}
 
   # Placeholder teammate services, not implemented yet:

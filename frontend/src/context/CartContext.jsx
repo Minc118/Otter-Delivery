@@ -7,6 +7,7 @@ import {
   getDeliveryFeeCents,
   getInitialCartGroups,
 } from "../services/cartService.js";
+import { assignDriverToOrder } from "../services/driverService.js";
 import { getCartItemCount } from "../utils/cartTotals.js";
 import { priceToCents } from "../utils/currency.js";
 
@@ -198,7 +199,7 @@ export function CartProvider({ children }) {
     );
   }
 
-  function placeCheckoutOrder(paymentMethod) {
+  async function placeCheckoutOrder(paymentMethod) {
     const group = checkoutDraft ?? selectedGroup;
 
     if (!group) {
@@ -215,7 +216,27 @@ export function CartProvider({ children }) {
     setCheckoutDraft(null);
     removeRestaurant(group.restaurantId);
 
-    return placedOrder;
+    try {
+      const assignment = await assignDriverToOrder(placedOrder.id);
+      const assignedOrder = {
+        ...placedOrder,
+        assignedDriver: assignment.driver,
+        assignment: assignment.assignment,
+        assignmentStatus: "assigned",
+      };
+
+      setLastPlacedOrder(assignedOrder);
+      return assignedOrder;
+    } catch (error) {
+      const unassignedOrder = {
+        ...placedOrder,
+        assignmentError: error.message,
+        assignmentStatus: "failed",
+      };
+
+      setLastPlacedOrder(unassignedOrder);
+      return unassignedOrder;
+    }
   }
 
   const value = useMemo(

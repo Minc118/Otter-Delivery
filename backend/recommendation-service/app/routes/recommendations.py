@@ -1,16 +1,58 @@
-from fastapi import APIRouter
+from uuid import UUID
 
-from app.models.recommendation import (
-    RecommendationRequest,
+from fastapi import APIRouter, Depends, HTTPException, Path, status
+from sqlalchemy.orm import Session
+
+from app.config import Settings, get_settings
+from app.database import get_db
+from app.schemas import (
+    RecommendationFeedback,
+    RecommendationFeedbackCreate,
+    RecommendationHistory,
+    RecommendationRequestCreate,
     RecommendationResponse,
 )
-from app.services.recommendation_engine import get_recommendations
+from app.services.recommendation_service import RecommendationService
 
-router = APIRouter()
+router = APIRouter(tags=["recommendations"])
 
 
 @router.post("/recommendations", response_model=RecommendationResponse)
-def recommendations(request: RecommendationRequest) -> RecommendationResponse:
-    return RecommendationResponse(
-        recommendations=get_recommendations(request),
-    )
+def create_recommendations(
+    payload: RecommendationRequestCreate,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RecommendationResponse:
+    service = RecommendationService(db, settings)
+    return service.create_recommendations(payload)
+
+
+@router.get("/recommendations/history/{userId}", response_model=RecommendationHistory)
+def get_recommendation_history(
+    userId: str = Path(..., min_length=1),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RecommendationHistory:
+    service = RecommendationService(db, settings)
+    history = service.get_history(userId)
+    if history is None:
+        raise HTTPException(status_code=404, detail="Recommendation history not found.")
+    return history
+
+
+@router.post(
+    "/recommendations/{recommendationResultId}/feedback",
+    response_model=RecommendationFeedback,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_recommendation_feedback(
+    payload: RecommendationFeedbackCreate,
+    recommendationResultId: UUID = Path(...),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RecommendationFeedback:
+    service = RecommendationService(db, settings)
+    feedback = service.create_feedback(recommendationResultId, payload)
+    if feedback is None:
+        raise HTTPException(status_code=404, detail="Recommendation result not found.")
+    return feedback

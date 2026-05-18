@@ -3,6 +3,7 @@ import { formatCurrency } from "../../utils/currency.js";
 export default function CheckoutSummaryPanel({
   buttonLabel,
   deliveryFeeCents,
+  disabled = false,
   onPrimaryAction,
   subtotalCents,
   totalCents,
@@ -27,7 +28,8 @@ export default function CheckoutSummaryPanel({
         <span>{formatCurrency(totalCents)}</span>
       </div>
       <button
-        className="w-full bg-primary-container hover:bg-surface-tint text-on-primary font-button text-button py-[18px] px-6 rounded-2xl transition-colors duration-300 flex justify-center items-center gap-2"
+        className="w-full bg-primary-container hover:bg-surface-tint disabled:bg-surface-variant disabled:text-on-surface-variant text-on-primary font-button text-button py-[18px] px-6 rounded-2xl transition-colors duration-300 flex justify-center items-center gap-2"
+        disabled={disabled}
         onClick={onPrimaryAction}
         type="button"
       >

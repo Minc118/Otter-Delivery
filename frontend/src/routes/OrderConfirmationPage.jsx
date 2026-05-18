@@ -20,6 +20,7 @@ export default function OrderConfirmationPage() {
   } = useCart();
   const checkoutGroup = checkoutDraft ?? selectedGroup;
   const [paymentMethod, setPaymentMethod] = useState(paymentMethods[0].id);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const restaurantMeta = checkoutGroup
     ? getRestaurantCheckoutMeta(checkoutGroup.restaurantId)
     : null;
@@ -55,12 +56,19 @@ export default function OrderConfirmationPage() {
     );
   }
 
-  function handlePayAndPlaceOrder() {
-    const order = placeCheckoutOrder(paymentMethod);
+  async function handlePayAndPlaceOrder() {
+    if (isPlacingOrder) {
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    const order = await placeCheckoutOrder(paymentMethod);
 
     if (order) {
       navigate(`/orders/${order.id}/success`);
     }
+
+    setIsPlacingOrder(false);
   }
 
   return (
@@ -154,8 +162,9 @@ export default function OrderConfirmationPage() {
           <div className="w-full lg:w-1/3 relative">
             <div className="sticky top-28 flex flex-col gap-stack-md">
               <CheckoutSummaryPanel
-                buttonLabel="Pay and place order"
+                buttonLabel={isPlacingOrder ? "Placing order..." : "Pay and place order"}
                 deliveryFeeCents={deliveryFeeCents}
+                disabled={isPlacingOrder}
                 onPrimaryAction={handlePayAndPlaceOrder}
                 subtotalCents={subtotalCents}
                 totalCents={totalCents}
