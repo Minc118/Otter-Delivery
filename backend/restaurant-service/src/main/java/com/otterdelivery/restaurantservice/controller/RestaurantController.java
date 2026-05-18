@@ -27,7 +27,7 @@ public class RestaurantController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<RestaurantResponseDTO> getRestaurantById(@PathVariable Long id) {
+    public ResponseEntity<RestaurantResponseDTO> getRestaurantById(@PathVariable("id")  Long id) {
         RestaurantResponseDTO restaurant = restaurantService.getRestaurantById(id);
         return ResponseEntity.ok(restaurant);
     }
@@ -39,25 +39,25 @@ public class RestaurantController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<RestaurantResponseDTO> updateRestaurant(@PathVariable Long id, @Valid @RequestBody RestaurantRequestDTO restaurantRequestDTO) {
+    public ResponseEntity<RestaurantResponseDTO> updateRestaurant(@PathVariable("id")  Long id, @Valid @RequestBody RestaurantRequestDTO restaurantRequestDTO) {
         RestaurantResponseDTO updatedRestaurant = restaurantService.updateRestaurant(id, restaurantRequestDTO);
         return ResponseEntity.ok(updatedRestaurant);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteRestaurant(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteRestaurant(@PathVariable("id")  Long id) {
         restaurantService.deleteRestaurant(id);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<RestaurantResponseDTO> updateRestaurantStatus(@PathVariable Long id, @RequestParam boolean open) {
+    public ResponseEntity<RestaurantResponseDTO> updateRestaurantStatus(@PathVariable("id")  Long id, @RequestParam("open") boolean open) {
         RestaurantResponseDTO updatedRestaurant = restaurantService.updateRestaurantStatus(id, open);
         return ResponseEntity.ok(updatedRestaurant);
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<RestaurantResponseDTO>> searchRestaurants(@RequestParam String name) {
+    public ResponseEntity<List<RestaurantResponseDTO>> searchRestaurants(@RequestParam("name") String name) {
         List<RestaurantResponseDTO> restaurants = restaurantService.searchRestaurants(name);
         return ResponseEntity.ok(restaurants);
     }
