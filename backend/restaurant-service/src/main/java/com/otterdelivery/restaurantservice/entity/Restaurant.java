@@ -39,8 +39,8 @@ public class Restaurant {
     @NotNull
     private LocalTime closingTime;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "address_id")
+    @OneToOne(cascade = CascadeType.ALL,optional = false)
+    @JoinColumn(name = "address_id",nullable = false)
     private Address address;
 
     @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true)

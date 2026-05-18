@@ -1,7 +1,9 @@
 package com.otterdelivery.restaurantservice.dto.response;
 
-import java.util.List;
+import lombok.Data;
 
+import java.util.List;
+@Data
 public class CategoryResponseDTO {
 
     private Long id;
@@ -20,35 +22,4 @@ public class CategoryResponseDTO {
     }
 
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public Long getRestaurantId() {
-        return restaurantId;
-    }
-
-    public void setRestaurantId(Long restaurantId) {
-        this.restaurantId = restaurantId;
-    }
 }
