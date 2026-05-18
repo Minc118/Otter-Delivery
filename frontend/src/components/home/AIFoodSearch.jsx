@@ -1,10 +1,11 @@
 import { useState } from "react";
 
-export default function AIFoodSearch() {
+export default function AIFoodSearch({ onSearch }) {
   const [query, setQuery] = useState("");
 
   function handleSubmit(event) {
     event.preventDefault();
+    onSearch?.(query);
   }
 
   return (

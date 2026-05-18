@@ -1,0 +1,4 @@
+ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recommendation_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recommendation_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recommendation_feedback ENABLE ROW LEVEL SECURITY;

@@ -1,6 +1,13 @@
 node_modules
 dist
+.env
+.env.*
+!.env.example
 .DS_Store
 docs/
+.venv/
+.gocache/
+.gomodcache/
 __pycache__/
 *.pyc
+supabase/.temp/

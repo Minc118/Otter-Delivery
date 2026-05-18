@@ -1,136 +1,191 @@
 package services
 
 import (
+	"context"
 	"errors"
-	"os"
-	"strconv"
-	"sync"
-	"time"
+	"fmt"
+	"math"
+	"strings"
 
 	"otter-delivery/driver-service/internal/models"
+	"otter-delivery/driver-service/internal/repository"
 )
 
-const (
-	StatusAvailable  = "AVAILABLE"
-	StatusOnDelivery = "ON_DELIVERY"
-	StatusOffline    = "OFFLINE"
-)
+type ValidationError struct {
+	Message string
+}
+
+func (e ValidationError) Error() string {
+	return e.Message
+}
 
 type DriverService struct {
-	drivers map[string]models.Driver
-	mu      sync.RWMutex
+	repo      repository.DriverRepository
+	estimator RouteEstimator
 }
 
-func NewDriverService() *DriverService {
+func NewDriverService(repo repository.DriverRepository, estimator RouteEstimator) *DriverService {
 	return &DriverService{
-		drivers: map[string]models.Driver{
-			"drv_001": {
-				DriverID: "drv_001",
-				Name:     "Alex M.",
-				Status:   StatusAvailable,
-				CurrentLocation: models.Location{
-					Lat: 52.5200,
-					Lng: 13.4050,
-				},
-			},
-			"drv_002": {
-				DriverID: "drv_002",
-				Name:     "Sam K.",
-				Status:   StatusAvailable,
-				CurrentLocation: models.Location{
-					Lat: 52.5180,
-					Lng: 13.4090,
-				},
-			},
-		},
+		repo:      repo,
+		estimator: estimator,
 	}
 }
 
-func (s *DriverService) AvailableDrivers() []models.Driver {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	drivers := make([]models.Driver, 0)
-	for _, driver := range s.drivers {
-		if driver.Status == StatusAvailable {
-			drivers = append(drivers, driver)
-		}
+func (s *DriverService) CreateDriver(ctx context.Context, request models.CreateDriverRequest) (models.Driver, error) {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		return models.Driver{}, ValidationError{Message: "Driver name is required."}
 	}
 
-	return drivers
+	status := request.Status
+	if status == "" {
+		status = models.DriverStatusAvailable
+	}
+	if !isValidDriverStatus(status) {
+		return models.Driver{}, ValidationError{Message: "Driver status must be AVAILABLE, ON_DELIVERY, or OFFLINE."}
+	}
+
+	if request.CurrentLocation == nil || !isValidLocation(*request.CurrentLocation) {
+		return models.Driver{}, ValidationError{Message: "Current location must include a valid latitude and longitude."}
+	}
+
+	return s.repo.CreateDriver(ctx, repository.CreateDriverParams{
+		Name:     name,
+		Status:   status,
+		Location: *request.CurrentLocation,
+	})
 }
 
-func (s *DriverService) EstimateDelivery(_ models.EstimateRequest) (models.EstimateResponse, error) {
-	drivers := s.AvailableDrivers()
+func (s *DriverService) AvailableDrivers(ctx context.Context) ([]models.Driver, error) {
+	return s.repo.ListAvailableDrivers(ctx)
+}
+
+func (s *DriverService) GetDriverByID(ctx context.Context, driverID string) (models.Driver, error) {
+	driverID = strings.TrimSpace(driverID)
+	if driverID == "" {
+		return models.Driver{}, ValidationError{Message: "Driver ID is required."}
+	}
+
+	return s.repo.GetDriverByID(ctx, driverID)
+}
+
+func (s *DriverService) UpdateDriverPosition(ctx context.Context, driverID string, request models.UpdateDriverPositionRequest) (models.Driver, error) {
+	driverID = strings.TrimSpace(driverID)
+	if driverID == "" {
+		return models.Driver{}, ValidationError{Message: "Driver ID is required."}
+	}
+
+	location, ok := request.EffectiveLocation()
+	if !ok || !isValidLocation(location) {
+		return models.Driver{}, ValidationError{Message: "Position must include a valid latitude and longitude."}
+	}
+
+	return s.repo.UpdateDriverPosition(ctx, driverID, location)
+}
+
+func (s *DriverService) AssignDriver(ctx context.Context, request models.AssignDriverRequest) (models.AssignDriverResponse, error) {
+	orderID := strings.TrimSpace(request.OrderID)
+	if orderID == "" {
+		return models.AssignDriverResponse{}, ValidationError{Message: "Order ID is required."}
+	}
+
+	assignment, driver, err := s.repo.AssignDriverToOrder(ctx, orderID, strings.TrimSpace(request.DriverID))
+	if err != nil {
+		return models.AssignDriverResponse{}, err
+	}
+
+	return models.AssignDriverResponse{
+		Assignment: assignment,
+		Driver:     driver,
+	}, nil
+}
+
+func (s *DriverService) EstimateDelivery(ctx context.Context, request models.EstimateRequest) (models.EstimateResponse, error) {
+	if request.CustomerLocation == nil || !isValidLocation(*request.CustomerLocation) {
+		return models.EstimateResponse{}, ValidationError{Message: "Customer location must include a valid latitude and longitude."}
+	}
+	if request.PickupLocation != nil && !isValidLocation(*request.PickupLocation) {
+		return models.EstimateResponse{}, ValidationError{Message: "Pickup location must include a valid latitude and longitude."}
+	}
+
+	drivers, err := s.repo.ListAvailableDrivers(ctx)
+	if err != nil {
+		return models.EstimateResponse{}, err
+	}
 	if len(drivers) == 0 {
-		return models.EstimateResponse{}, errors.New("no available drivers")
+		return models.EstimateResponse{}, repository.ErrNoAvailableDriver
 	}
 
-	// TODO: Replace the fixed ETA with Google Maps route estimation later.
 	driver := drivers[0]
-	minutes := fixedETAMinutes()
+	origin := driver.CurrentLocation
+	if request.PickupLocation != nil {
+		origin = *request.PickupLocation
+	}
 
+	routeResult, err := s.estimator.Estimate(ctx, RouteEstimateRequest{
+		Origin:      origin,
+		Destination: *request.CustomerLocation,
+	})
+	if err != nil {
+		return models.EstimateResponse{}, fmt.Errorf("estimate route: %w", err)
+	}
+
+	estimate, err := s.repo.SaveRouteEstimate(ctx, models.RouteEstimate{
+		OrderID:             strings.TrimSpace(request.OrderID),
+		DriverID:            driver.DriverID,
+		OriginLocation:      origin,
+		DestinationLocation: *request.CustomerLocation,
+		DistanceMeters:      routeResult.DistanceMeters,
+		DurationSeconds:     routeResult.DurationSeconds,
+		Provider:            routeResult.Provider,
+	})
+	if err != nil {
+		return models.EstimateResponse{}, err
+	}
+
+	minutes := int(math.Ceil(float64(estimate.DurationSeconds) / 60))
 	return models.EstimateResponse{
+		Estimate:                     estimate,
+		Driver:                       driver,
 		EstimatedDeliveryTimeMinutes: minutes,
-		EtaLabel:                     "approx. 40 min",
-		DriverID:                     driver.DriverID,
-		Status:                       driver.Status,
+		EtaLabel:                     fmt.Sprintf("approx. %d min", minutes),
 	}, nil
 }
 
-func (s *DriverService) DriverLocation(driverID string) (models.DriverLocationResponse, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	driver, ok := s.drivers[driverID]
-	if !ok {
-		return models.DriverLocationResponse{}, false
+func (s *DriverService) GetTrackingByOrderID(ctx context.Context, orderID string) (models.TrackingResponse, error) {
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return models.TrackingResponse{}, ValidationError{Message: "Order ID is required."}
 	}
 
-	return models.DriverLocationResponse{
-		DriverID:  driver.DriverID,
-		Status:    driver.Status,
-		Location:  driver.CurrentLocation,
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
-	}, true
+	return s.repo.GetTrackingByOrderID(ctx, orderID)
 }
 
-func (s *DriverService) UpdateStatus(driverID string, status string) (models.StatusUpdateResponse, error) {
-	if !isValidStatus(status) {
-		return models.StatusUpdateResponse{}, errors.New("invalid driver status")
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	driver, ok := s.drivers[driverID]
-	if !ok {
-		return models.StatusUpdateResponse{}, errors.New("driver not found")
-	}
-
-	driver.Status = status
-	s.drivers[driverID] = driver
-
-	return models.StatusUpdateResponse{
-		DriverID: driver.DriverID,
-		Status:   driver.Status,
-	}, nil
+func IsValidationError(err error) bool {
+	var validationError ValidationError
+	return errors.As(err, &validationError)
 }
 
-func fixedETAMinutes() int {
-	value := os.Getenv("ETA_MINUTES")
-	if value == "" {
-		return 40
+func ValidationMessage(err error) string {
+	var validationError ValidationError
+	if errors.As(err, &validationError) {
+		return validationError.Message
 	}
 
-	minutes, err := strconv.Atoi(value)
-	if err != nil || minutes <= 0 {
-		return 40
-	}
-
-	return minutes
+	return "Invalid input."
 }
 
-func isValidStatus(status string) bool {
-	return status == StatusAvailable || status == StatusOnDelivery || status == StatusOffline
+func isValidDriverStatus(status models.DriverStatus) bool {
+	return status == models.DriverStatusAvailable ||
+		status == models.DriverStatusOnDelivery ||
+		status == models.DriverStatusOffline
+}
+
+func isValidLocation(location models.Location) bool {
+	return !math.IsNaN(location.Lat) &&
+		!math.IsNaN(location.Lng) &&
+		location.Lat >= -90 &&
+		location.Lat <= 90 &&
+		location.Lng >= -180 &&
+		location.Lng <= 180
 }

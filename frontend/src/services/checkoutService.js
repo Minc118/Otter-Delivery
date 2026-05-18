@@ -4,10 +4,15 @@ import {
 } from "../data/checkout.js";
 import { getRestaurantSubtotalCents } from "../utils/cartTotals.js";
 
-const MOCK_ORDER_ID = "ot-9824";
-
 function cloneItems(items) {
   return items.map((item) => ({ ...item }));
+}
+
+function createOrderId() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 6);
+
+  return `ot-${timestamp}-${random}`;
 }
 
 export function cloneCartGroup(group) {
@@ -40,10 +45,12 @@ export function createMockPlacedOrder({
 }) {
   const subtotalCents = getRestaurantSubtotalCents(group);
   const restaurantMeta = getRestaurantCheckoutMeta(group.restaurantId);
+  const id = createOrderId();
 
   return {
-    id: MOCK_ORDER_ID,
-    displayId: MOCK_ORDER_ID.toUpperCase(),
+    id,
+    assignmentStatus: "pending",
+    displayId: id.toUpperCase(),
     restaurantId: group.restaurantId,
     restaurantName: group.restaurantName,
     restaurantImage: restaurantMeta.image,

@@ -21,6 +21,8 @@ export default function OrderSuccessPage() {
     document.title = "Order Placed - Otter Delivery";
   }, []);
 
+  const assignmentMessage = getAssignmentMessage(order);
+
   return (
     <div
       className="bg-surface-container-lowest min-h-screen"
@@ -50,8 +52,7 @@ export default function OrderSuccessPage() {
             Order placed successfully
           </h1>
           <p className="text-on-surface-variant mb-10 max-w-md mx-auto relative z-10">
-            Your order has been received and the restaurant will start preparing
-            it soon.
+            {assignmentMessage}
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-left relative z-10">
@@ -120,6 +121,18 @@ export default function OrderSuccessPage() {
       </PageShell>
     </div>
   );
+}
+
+function getAssignmentMessage(order) {
+  if (order.assignmentStatus === "assigned" && order.assignedDriver?.name) {
+    return `${order.assignedDriver.name} accepted the delivery and is heading to the restaurant.`;
+  }
+
+  if (order.assignmentStatus === "failed") {
+    return "Your order was placed, but no driver could be assigned automatically yet.";
+  }
+
+  return "Your order has been received and the restaurant will start preparing it soon.";
 }
 
 function SuccessStat({ label, value }) {
