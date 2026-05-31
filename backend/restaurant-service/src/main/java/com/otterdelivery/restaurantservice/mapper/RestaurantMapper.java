@@ -5,11 +5,9 @@ import com.otterdelivery.restaurantservice.dto.response.AddressDTO;
 import com.otterdelivery.restaurantservice.dto.response.RestaurantResponseDTO;
 import com.otterdelivery.restaurantservice.entity.Address;
 import com.otterdelivery.restaurantservice.entity.Restaurant;
-import javax.annotation.processing.Generated;
 import org.springframework.stereotype.Component;
 
 @Component
-@Generated({})
 public class RestaurantMapper {
 
     public RestaurantResponseDTO toResponseDTO(Restaurant restaurant) {

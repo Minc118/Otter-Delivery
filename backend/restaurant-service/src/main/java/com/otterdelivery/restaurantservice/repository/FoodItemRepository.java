@@ -12,6 +12,13 @@ public interface FoodItemRepository extends JpaRepository<FoodItem, Long> {
 
     List<FoodItem> findByAvailableTrue();
 
+    @Query("""
+        SELECT f
+        FROM FoodItem f
+        WHERE f.category.restaurant.id = :restaurantId
+    """)
+    List<FoodItem> findByRestaurantId(@Param("restaurantId") Long restaurantId);
+
     @Query("SELECT f FROM FoodItem f WHERE LOWER(f.name) LIKE LOWER(CONCAT('%', :name, '%'))")
     List<FoodItem> findByNameContainingIgnoreCase(@Param("name") String name);
 }

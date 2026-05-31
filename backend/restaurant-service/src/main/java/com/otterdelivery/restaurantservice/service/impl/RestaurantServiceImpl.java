@@ -2,7 +2,6 @@ package com.otterdelivery.restaurantservice.service.impl;
 
 import com.otterdelivery.restaurantservice.dto.request.RestaurantRequestDTO;
 import com.otterdelivery.restaurantservice.dto.response.RestaurantResponseDTO;
-import com.otterdelivery.restaurantservice.entity.Address;
 import com.otterdelivery.restaurantservice.entity.Restaurant;
 import com.otterdelivery.restaurantservice.mapper.RestaurantMapper;
 import com.otterdelivery.restaurantservice.repository.RestaurantRepository;

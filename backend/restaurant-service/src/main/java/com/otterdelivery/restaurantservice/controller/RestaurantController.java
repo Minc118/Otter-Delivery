@@ -2,7 +2,6 @@ package com.otterdelivery.restaurantservice.controller;
 
 import com.otterdelivery.restaurantservice.dto.request.RestaurantRequestDTO;
 import com.otterdelivery.restaurantservice.dto.response.RestaurantResponseDTO;
-import com.otterdelivery.restaurantservice.exception.RestaurantNotFoundException;
 import com.otterdelivery.restaurantservice.service.RestaurantService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/api/restaurants")
 public class RestaurantController {

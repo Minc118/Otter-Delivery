@@ -2,7 +2,6 @@ package com.otterdelivery.restaurantservice.dto.response;
 
 import lombok.Data;
 
-import java.util.List;
 @Data
 public class CategoryResponseDTO {
 

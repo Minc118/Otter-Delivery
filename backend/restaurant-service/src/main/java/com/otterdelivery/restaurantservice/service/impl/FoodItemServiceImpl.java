@@ -101,4 +101,24 @@ public class FoodItemServiceImpl implements com.otterdelivery.restaurantservice.
                 .map(foodItemMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public FoodItemResponseDTO getFoodItemById(Long id) {
+
+        FoodItem foodItem = foodItemRepository.findById(id)
+                .orElseThrow(() ->
+                        new FoodItemNotFoundException("Food item not found with id: " + id));
+
+        return foodItemMapper.toResponseDTO(foodItem);
+    }
+
+    public List<FoodItemResponseDTO> getFoodItemsByRestaurant(Long restaurantId) {
+
+        List<FoodItem> foodItems =
+                foodItemRepository.findByRestaurantId(restaurantId);
+
+        return foodItems.stream()
+                .map(foodItemMapper::toResponseDTO)
+                .collect(Collectors.toList());
+    }
 }

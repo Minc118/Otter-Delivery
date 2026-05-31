@@ -3,11 +3,9 @@ package com.otterdelivery.restaurantservice.mapper;
 import com.otterdelivery.restaurantservice.dto.request.CategoryRequestDTO;
 import com.otterdelivery.restaurantservice.dto.response.CategoryResponseDTO;
 import com.otterdelivery.restaurantservice.entity.Category;
-import javax.annotation.processing.Generated;
 import org.springframework.stereotype.Component;
 
 @Component
-@Generated({})
 public class CategoryMapper {
 
     public CategoryResponseDTO toResponseDTO(Category category) {

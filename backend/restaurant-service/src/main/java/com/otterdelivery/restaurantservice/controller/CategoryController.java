@@ -2,7 +2,6 @@ package com.otterdelivery.restaurantservice.controller;
 
 import com.otterdelivery.restaurantservice.dto.request.CategoryRequestDTO;
 import com.otterdelivery.restaurantservice.dto.response.CategoryResponseDTO;
-import com.otterdelivery.restaurantservice.exception.CategoryNotFoundException;
 import com.otterdelivery.restaurantservice.service.CategoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

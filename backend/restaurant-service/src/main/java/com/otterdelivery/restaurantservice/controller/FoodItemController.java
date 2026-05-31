@@ -2,7 +2,6 @@ package com.otterdelivery.restaurantservice.controller;
 
 import com.otterdelivery.restaurantservice.dto.request.FoodItemRequestDTO;
 import com.otterdelivery.restaurantservice.dto.response.FoodItemResponseDTO;
-import com.otterdelivery.restaurantservice.exception.FoodItemNotFoundException;
 import com.otterdelivery.restaurantservice.service.FoodItemService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/api/food-items")
 public class FoodItemController {
@@ -66,5 +66,20 @@ public class FoodItemController {
     public ResponseEntity<List<FoodItemResponseDTO>> getAvailableFoodItems() {
         List<FoodItemResponseDTO> foodItems = foodItemService.getAvailableFoodItems();
         return ResponseEntity.ok(foodItems);
+    }
+
+    @GetMapping("/restaurants/{restaurantId}")
+    public ResponseEntity<List<FoodItemResponseDTO>> getFoodItemsByRestaurant(
+            @PathVariable("restaurantId") Long restaurantId) {
+
+        return ResponseEntity.ok(
+                foodItemService.getFoodItemsByRestaurant(restaurantId)
+        );
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<FoodItemResponseDTO> getFoodItemById(@PathVariable("id") Long id) {
+        FoodItemResponseDTO foodItem = foodItemService.getFoodItemById(id);
+        return ResponseEntity.ok(foodItem);
     }
 }

@@ -19,4 +19,8 @@ public interface FoodItemService {
     List<FoodItemResponseDTO> searchFoodItems(String name);
 
     List<FoodItemResponseDTO> getAvailableFoodItems();
+
+    FoodItemResponseDTO getFoodItemById(Long id);
+
+    List<FoodItemResponseDTO> getFoodItemsByRestaurant(Long restaurantId);
 }
