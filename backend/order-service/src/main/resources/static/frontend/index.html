@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Otter Delivery</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>Otter Delivery</h1>
+
+    <div class="card">
+        <h2>Create Order</h2>
+
+        <label>Restaurant</label>
+        <select id="restaurantSelect" onchange="loadMenuItems()">
+            <option value="">Choose a restaurant</option>
+        </select>
+
+        <label>Menu Item</label>
+        <select id="menuItemSelect">
+            <option value="">Choose a menu item</option>
+        </select>
+
+        <label>Quantity</label>
+        <input type="number" id="quantity" value="1" min="1">
+
+        <button onclick="addToCart()">Add to Cart</button>
+        <button onclick="createOrder()">Place Order</button>
+    </div>
+
+    <div class="card">
+        <h2>Your Cart</h2>
+        <div id="cartContainer">
+            <p>Your cart is empty.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>All Orders</h2>
+        <button onclick="loadOrders()">Refresh Orders</button>
+        <div id="ordersContainer"></div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
