@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { CartContext } from "../context/CartContext.jsx";
 import { useParams } from "react-router-dom";
 import RestaurantHero from "../components/restaurant/RestaurantHero.jsx";
 import {
@@ -8,7 +9,7 @@ import {
 
 export default function RestaurantDetailPage() {
   const { id } = useParams();
-
+  const { addItem } = useContext(CartContext);
   const [restaurant, setRestaurant] = useState(null);
   const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +73,23 @@ export default function RestaurantDetailPage() {
                       <p>
                         {item.available ? "Available" : "Unavailable"}
                       </p>
+
+                      <button
+                          className="mt-3 bg-blue-500 text-white px-4 py-2 rounded"
+                          onClick={() =>
+                              addItem({
+                                restaurantId: restaurant.id,
+                                restaurantName: restaurant.name,
+                                item: {
+                                  id: item.id,
+                                  name: item.name,
+                                  priceCents: Math.round(item.price * 100),
+                                },
+                              })
+                          }
+                      >
+                        Add to Cart
+                      </button>
                     </div>
                 ))}
               </div>

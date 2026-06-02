@@ -206,11 +206,37 @@ export function CartProvider({ children }) {
       return null;
     }
 
-    const placedOrder = createMockPlacedOrder({
-      deliveryFeeCents,
-      group,
-      paymentMethod,
+    const response = await fetch("http://localhost:8002/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        customerId: 1,
+        restaurantId: group.restaurantId,
+        items: group.items.map((item) => ({
+          menuItemId: item.id,
+          quantity: item.quantity,
+        })),
+      }),
     });
+
+    if (!response.ok) {
+      throw new Error("Failed to create order");
+    }
+
+    const backendOrder = await response.json();
+
+    const placedOrder = {
+      id: backendOrder.id,
+      displayId: `ORDER-${backendOrder.id}`,
+      restaurantId: group.restaurantId,
+      restaurantName: group.restaurantName,
+      items: group.items,
+      paymentMethod,
+      totalCents: Math.round(backendOrder.totalPrice * 100),
+      estimatedDeliveryTime: "approx. 40 min",
+    };
 
     setLastPlacedOrder(placedOrder);
     setCheckoutDraft(null);
