@@ -12,8 +12,8 @@ import { getCartItemCount } from "../utils/cartTotals.js";
 import { priceToCents } from "../utils/currency.js";
 
 export const CartContext = createContext(null);
-
 export function CartProvider({ children }) {
+  const [cartWarning, setCartWarning] = useState(null);
   const initialCartGroups = getInitialCartGroups();
   const deliveryFeeCents = getDeliveryFeeCents();
   const [cartGroups, setCartGroups] = useState(initialCartGroups);
@@ -50,6 +50,19 @@ export function CartProvider({ children }) {
   }
 
   function addItem({ restaurantId, restaurantName, item }) {
+    const existingGroup = cartGroups[0];
+
+    if (
+        existingGroup &&
+        existingGroup.restaurantId !== restaurantId
+    ) {
+      setCartWarning(
+          `Your cart already contains items from ${existingGroup.restaurantName}. Please clear your cart before ordering from another restaurant.`
+      );
+
+      return;
+    }
+    setCartWarning(null);
     const unitPriceCents = item.priceCents ?? priceToCents(item.price);
 
     setCartGroups((currentGroups) => {
@@ -266,26 +279,35 @@ export function CartProvider({ children }) {
   }
 
   const value = useMemo(
-    () => ({
-      addItem,
-      beginCheckout,
-      cartGroups,
-      checkoutDraft,
-      decrementItem,
-      deliveryFeeCents,
-      incrementItem,
-      itemCount,
-      lastPlacedOrder,
-      placeCheckoutOrder,
-      removeItem,
-      removeRestaurant,
-      restaurantCount: cartGroups.length,
-      selectedGroup,
-      selectedRestaurantId: selectedGroup?.restaurantId ?? null,
-      selectRestaurant,
-      updateItemQuantity,
-    }),
-    [cartGroups, checkoutDraft, itemCount, lastPlacedOrder, selectedGroup],
+      () => ({
+        addItem,
+        beginCheckout,
+        cartGroups,
+        checkoutDraft,
+        decrementItem,
+        deliveryFeeCents,
+        incrementItem,
+        itemCount,
+        lastPlacedOrder,
+        placeCheckoutOrder,
+        removeItem,
+        removeRestaurant,
+        restaurantCount: cartGroups.length,
+        selectedGroup,
+        selectedRestaurantId: selectedGroup?.restaurantId ?? null,
+        selectRestaurant,
+        updateItemQuantity,
+        cartWarning,
+        setCartWarning,
+      }),
+      [
+        cartGroups,
+        checkoutDraft,
+        itemCount,
+        lastPlacedOrder,
+        selectedGroup,
+        cartWarning,
+      ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

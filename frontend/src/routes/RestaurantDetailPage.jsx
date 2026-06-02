@@ -9,8 +9,7 @@ import {
 
 export default function RestaurantDetailPage() {
   const { id } = useParams();
-  const { addItem } = useContext(CartContext);
-  const [restaurant, setRestaurant] = useState(null);
+  const { addItem, cartWarning, setCartWarning } = useContext(CartContext);  const [restaurant, setRestaurant] = useState(null);
   const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,7 +49,20 @@ export default function RestaurantDetailPage() {
 
         <section className="max-w-4xl mx-auto p-6">
           <h2 className="text-2xl font-bold mb-4">Menu</h2>
+          {cartWarning && (
+              <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
+                <div className="flex justify-between gap-4">
+                  <p>{cartWarning}</p>
 
+                  <button
+                      className="font-bold"
+                      onClick={() => setCartWarning(null)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+          )}
           {foodItems.length === 0 ? (
               <p>No food items available.</p>
           ) : (
