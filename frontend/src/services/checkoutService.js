@@ -26,7 +26,14 @@ export function cloneCartGroup(group) {
   };
 }
 
-export function getRestaurantCheckoutMeta(restaurantId) {
+export function getRestaurantCheckoutMeta(restaurantId, restaurantMeta = null) {
+  if (restaurantMeta?.image) {
+    return {
+      rating: restaurantMeta.rating ?? "4.8 Excellent",
+      image: restaurantMeta.image,
+    };
+  }
+
   return (
     checkoutRestaurantMeta[restaurantId] ?? {
       rating: "4.8 Excellent",
@@ -44,7 +51,10 @@ export function createMockPlacedOrder({
   paymentMethod,
 }) {
   const subtotalCents = getRestaurantSubtotalCents(group);
-  const restaurantMeta = getRestaurantCheckoutMeta(group.restaurantId);
+  const restaurantMeta = getRestaurantCheckoutMeta(
+    group.restaurantId,
+    group.restaurantMeta,
+  );
   const id = createOrderId();
 
   return {

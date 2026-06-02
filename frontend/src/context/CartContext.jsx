@@ -49,8 +49,24 @@ export function CartProvider({ children }) {
     return groups.filter((group) => group.items.length > 0);
   }
 
-  function addItem({ restaurantId, restaurantName, item }) {
-    const unitPriceCents = item.priceCents ?? priceToCents(item.price);
+  function addItem({ restaurantId, restaurantName, restaurantMeta, item }) {
+    const itemId = String(item.id ?? item.menuItemId ?? item.foodItemId);
+    const unitPriceCents =
+      item.unitPriceCents ?? item.priceCents ?? priceToCents(item.price);
+    const cartItem = {
+      id: itemId,
+      foodItemId: item.foodItemId,
+      menuItemId: item.menuItemId,
+      name: item.name,
+      description: item.description,
+      quantity: 1,
+      unitPriceCents,
+      price: item.price,
+      image: item.image,
+      currency: item.currency,
+      restaurantId,
+      restaurantName,
+    };
 
     setCartGroups((currentGroups) => {
       const groupIndex = currentGroups.findIndex(
@@ -63,13 +79,9 @@ export function CartProvider({ children }) {
           {
             restaurantId,
             restaurantName,
+            restaurantMeta,
             items: [
-              {
-                id: item.id,
-                name: item.name,
-                quantity: 1,
-                unitPriceCents,
-              },
+              cartItem,
             ],
           },
         ];
@@ -80,29 +92,24 @@ export function CartProvider({ children }) {
           return group;
         }
 
-        const existingItem = group.items.find(
-          (cartItem) => cartItem.id === item.id,
-        );
+        const existingItem = group.items.find((item) => item.id === itemId);
 
         if (!existingItem) {
           return {
             ...group,
+            restaurantMeta: group.restaurantMeta ?? restaurantMeta,
             items: [
               ...group.items,
-              {
-                id: item.id,
-                name: item.name,
-                quantity: 1,
-                unitPriceCents,
-              },
+              cartItem,
             ],
           };
         }
 
         return {
           ...group,
+          restaurantMeta: group.restaurantMeta ?? restaurantMeta,
           items: group.items.map((cartItem) =>
-            cartItem.id === item.id
+            cartItem.id === itemId
               ? { ...cartItem, quantity: cartItem.quantity + 1 }
               : cartItem,
           ),

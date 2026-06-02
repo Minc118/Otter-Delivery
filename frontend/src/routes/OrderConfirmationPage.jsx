@@ -22,7 +22,10 @@ export default function OrderConfirmationPage() {
   const [paymentMethod, setPaymentMethod] = useState(paymentMethods[0].id);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const restaurantMeta = checkoutGroup
-    ? getRestaurantCheckoutMeta(checkoutGroup.restaurantId)
+    ? getRestaurantCheckoutMeta(
+        checkoutGroup.restaurantId,
+        checkoutGroup.restaurantMeta,
+      )
     : null;
   const subtotalCents = useMemo(
     () => (checkoutGroup ? getRestaurantSubtotalCents(checkoutGroup) : 0),
