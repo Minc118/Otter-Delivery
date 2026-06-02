@@ -1,7 +1,15 @@
+import json
+import logging
 from typing import Any, Protocol
 
+import httpx
+
 from app.errors import LLMProviderError
+from app.config import Settings
+from app.services.scoring import ScoredCandidate
 from app.services.restaurant_client import Restaurant
+
+logger = logging.getLogger(__name__)
 
 
 class LLMRecommendationProvider(Protocol):
@@ -143,3 +151,169 @@ def _lower_set(value: Any) -> set[str]:
     if isinstance(value, list):
         return {str(item).lower() for item in value if item is not None}
     return set()
+
+
+class GeminiReranker:
+    def __init__(self, settings: Settings):
+        self.configured_enabled = settings.gemini_enabled
+        self.api_key = settings.gemini_api_key
+        self.model = settings.gemini_model
+        self.timeout = settings.restaurant_service_timeout_seconds
+        self.candidate_limit = settings.gemini_candidate_limit
+        self.menu_item_limit = settings.gemini_menu_item_limit
+
+    @property
+    def enabled(self) -> bool:
+        return self.configured_enabled and bool(self.api_key)
+
+    def rerank(
+        self,
+        *,
+        query: str | None,
+        preferences: dict[str, Any],
+        candidates: list[ScoredCandidate],
+    ) -> list[ScoredCandidate]:
+        if not self.enabled or not candidates:
+            return candidates
+
+        limited_candidates = candidates[: self.candidate_limit]
+        payload_candidates = [
+            {
+                "restaurantId": candidate.restaurant_id,
+                "restaurantName": candidate.restaurant_name,
+                "category": _candidate_category(candidate),
+                "priceRange": _candidate_price_range(candidate),
+                "tags": _compact_strings(candidate.matched_factors + candidate.negative_factors, 8),
+                "topMenuItems": candidate.recommended_items[: self.menu_item_limit],
+                "recommendationScore": candidate.recommendation_score,
+                "matchedFactors": _compact_strings(candidate.matched_factors, 6),
+                "negativeFactors": _compact_strings(candidate.negative_factors, 6),
+            }
+            for candidate in limited_candidates
+        ]
+        prompt = (
+            "You rerank restaurant recommendation candidates. "
+            "Only use the compact candidate fields provided. "
+            "Do not invent IDs, names, menu items, prices, availability, or tags. "
+            "Return strict JSON with this shape: "
+            '{"recommendations":[{"restaurantId":"...","reason":"short user-facing reason"}]}. '
+            "Rank best candidates first.\n"
+            f"User query: {query or ''}\n"
+            f"Preferences JSON: {json.dumps(preferences, ensure_ascii=True)}\n"
+            f"Candidates JSON: {json.dumps(payload_candidates, ensure_ascii=True)}"
+        )
+        response_payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"},
+        }
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                response = client.post(
+                    url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": self.api_key or "",
+                    },
+                    json=response_payload,
+                )
+                response.raise_for_status()
+                body = response.json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429:
+                logger.warning("gemini_rerank_fallback category=rate_limited")
+                raise LLMProviderError("Gemini reranking rate_limited.") from exc
+            logger.warning("gemini_rerank_fallback category=http_error status=%s", exc.response.status_code)
+            raise LLMProviderError("Gemini reranking failed.") from exc
+        except httpx.RequestError as exc:
+            logger.warning("gemini_rerank_fallback category=network_or_api_issue")
+            raise LLMProviderError("Gemini reranking failed.") from exc
+        except ValueError as exc:
+            logger.warning("gemini_rerank_fallback category=invalid_response")
+            raise LLMProviderError("Gemini reranking failed.") from exc
+
+        text = _extract_gemini_text(body)
+        try:
+            ranked_payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            logger.warning("gemini_rerank_fallback category=invalid_json")
+            raise LLMProviderError("Gemini returned invalid JSON.") from exc
+
+        ranked_ids = _valid_ranked_ids(ranked_payload, limited_candidates)
+        if not ranked_ids:
+            logger.warning("gemini_rerank_fallback category=validation_rejection")
+            raise LLMProviderError("Gemini returned no known restaurant IDs.")
+
+        candidate_by_id = {candidate.restaurant_id: candidate for candidate in limited_candidates}
+        reason_by_id = {
+            str(item.get("restaurantId")): str(item.get("reason"))
+            for item in ranked_payload.get("recommendations", [])
+            if isinstance(item, dict) and item.get("restaurantId") and item.get("reason")
+        }
+
+        reranked: list[ScoredCandidate] = []
+        seen: set[str] = set()
+        for restaurant_id in ranked_ids:
+            candidate = candidate_by_id[restaurant_id]
+            candidate.reason = reason_by_id.get(restaurant_id, candidate.reason)
+            candidate.source = "gemini"
+            candidate.feature_snapshot["source"] = "gemini"
+            reranked.append(candidate)
+            seen.add(restaurant_id)
+
+        for candidate in candidates:
+            if candidate.restaurant_id not in seen:
+                reranked.append(candidate)
+
+        return reranked
+
+
+def _extract_gemini_text(body: dict[str, Any]) -> str:
+    candidates = body.get("candidates") or []
+    if not candidates:
+        raise LLMProviderError("Gemini returned no candidates.")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    texts = [part.get("text", "") for part in parts if isinstance(part, dict)]
+    text = "\n".join(texts).strip()
+    if not text:
+        raise LLMProviderError("Gemini returned an empty response.")
+    return text
+
+
+def _valid_ranked_ids(payload: dict[str, Any], candidates: list[ScoredCandidate]) -> list[str]:
+    valid_ids = {candidate.restaurant_id for candidate in candidates}
+    ranked_ids: list[str] = []
+    for item in payload.get("recommendations", []):
+        if not isinstance(item, dict):
+            continue
+        restaurant_id = str(item.get("restaurantId", ""))
+        if restaurant_id in valid_ids and restaurant_id not in ranked_ids:
+            ranked_ids.append(restaurant_id)
+    return ranked_ids
+
+
+def _candidate_category(candidate: ScoredCandidate) -> str | None:
+    snapshot = candidate.feature_snapshot or {}
+    category = snapshot.get("candidate_category")
+    return str(category) if category else None
+
+
+def _candidate_price_range(candidate: ScoredCandidate) -> str | None:
+    snapshot = candidate.feature_snapshot or {}
+    price = snapshot.get("candidate_price_range")
+    return str(price) if price else None
+
+
+def _compact_strings(values: list[str], limit: int) -> list[str]:
+    compact: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = str(value).strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        compact.append(normalized)
+        if len(compact) >= limit:
+            break
+    return compact

@@ -6,11 +6,15 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.schemas import (
+    FeedbackCreateRequest,
+    FeedbackCreateResponse,
     RecommendationFeedback,
     RecommendationFeedbackCreate,
     RecommendationHistory,
     RecommendationRequestCreate,
     RecommendationResponse,
+    RestaurantRecommendationRequest,
+    RestaurantRecommendationResponse,
 )
 from app.services.recommendation_service import RecommendationService
 
@@ -25,6 +29,26 @@ def create_recommendations(
 ) -> RecommendationResponse:
     service = RecommendationService(db, settings)
     return service.create_recommendations(payload)
+
+
+@router.post("/recommendations/restaurants", response_model=RestaurantRecommendationResponse)
+def create_restaurant_recommendations(
+    payload: RestaurantRecommendationRequest,
+    db: Session | None = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RestaurantRecommendationResponse:
+    service = RecommendationService(db, settings)
+    return service.create_restaurant_recommendations(payload)
+
+
+@router.post("/feedback", response_model=FeedbackCreateResponse)
+def create_feedback(
+    payload: FeedbackCreateRequest,
+    db: Session | None = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> FeedbackCreateResponse:
+    service = RecommendationService(db, settings)
+    return service.create_mvp_feedback(payload)
 
 
 @router.get("/recommendations/history/{userId}", response_model=RecommendationHistory)

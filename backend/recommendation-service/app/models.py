@@ -115,13 +115,14 @@ class RecommendationFeedback(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    recommendation_result_id: Mapped[uuid.UUID] = mapped_column(
+    recommendation_result_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("recommendation_results.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    restaurant_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     feedback_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -131,4 +132,35 @@ class RecommendationFeedback(Base):
         server_default=func.now(),
     )
 
-    recommendation_result: Mapped[RecommendationResult] = relationship(back_populates="feedback")
+    recommendation_result: Mapped[RecommendationResult | None] = relationship(back_populates="feedback")
+
+
+class RecommendationTrainingEvent(Base):
+    __tablename__ = "recommendation_training_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    request_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("recommendation_requests.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    query: Mapped[str | None] = mapped_column(Text, nullable=True)
+    candidate_restaurant_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    recommendation_score: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False)
+    completion_score: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False)
+    training_loss_proxy: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False)
+    matched_factors: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    negative_factors: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    feature_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="fallback")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
