@@ -10,6 +10,8 @@ public interface FoodItemRepository extends JpaRepository<FoodItem, Long> {
 
     List<FoodItem> findByCategoryId(Long categoryId);
 
+    List<FoodItem> findByCategoryIdAndNameIgnoreCase(Long categoryId, String name);
+
     List<FoodItem> findByAvailableTrue();
 
     @Query("""
