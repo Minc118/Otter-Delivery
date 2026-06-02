@@ -1,16 +1,28 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.config import get_settings
 from app.errors import ServiceError
 from app.routes.preferences import router as preferences_router
 from app.routes.recommendations import router as recommendations_router
 
+settings = get_settings()
+
 app = FastAPI(
     title="Otter Delivery LLM Recommendation Service",
     version="0.2.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.frontend_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
