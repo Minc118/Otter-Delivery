@@ -6,7 +6,7 @@ import {
 } from "./restaurantAdapter.js";
 
 const RESTAURANT_SERVICE_BASE_URL =
-  import.meta.env.VITE_RESTAURANT_SERVICE_URL ?? "http://localhost:8080";
+  import.meta.env.VITE_RESTAURANT_SERVICE_URL ?? "http://localhost:8001";
 
 const RESTAURANT_API = `${RESTAURANT_SERVICE_BASE_URL}/api/restaurants`;
 const FOOD_ITEMS_API = `${RESTAURANT_SERVICE_BASE_URL}/api/food-items`;
