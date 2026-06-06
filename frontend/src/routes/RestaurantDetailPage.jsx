@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { CartContext } from "../context/CartContext.jsx";
 import { useParams } from "react-router-dom";
 import MenuSection from "../components/restaurant/MenuSection.jsx";
 import RestaurantHero from "../components/restaurant/RestaurantHero.jsx";
@@ -11,8 +12,7 @@ import { adaptRestaurant } from "../services/restaurantAdapter.js";
 
 export default function RestaurantDetailPage() {
   const { id } = useParams();
-
-  const [restaurant, setRestaurant] = useState(null);
+  const { addItem, cartWarning, setCartWarning } = useContext(CartContext);  const [restaurant, setRestaurant] = useState(null);
   const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -90,6 +90,68 @@ export default function RestaurantDetailPage() {
               title="No food items available"
             />
           </div>
+      <div className="bg-background min-h-full pb-stack-lg">
+        <RestaurantHero restaurant={restaurant} />
+
+        <section className="max-w-4xl mx-auto p-6">
+          <h2 className="text-2xl font-bold mb-4">Menu</h2>
+          {cartWarning && (
+              <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
+                <div className="flex justify-between gap-4">
+                  <p>{cartWarning}</p>
+
+                  <button
+                      className="font-bold"
+                      onClick={() => setCartWarning(null)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+          )}
+          {foodItems.length === 0 ? (
+              <p>No food items available.</p>
+          ) : (
+              <div className="space-y-4">
+                {foodItems.map((item) => (
+                    <div
+                        key={item.id}
+                        className="border rounded-lg p-4 bg-white"
+                    >
+                      <h3 className="font-semibold text-lg">
+                        {item.name}
+                      </h3>
+
+                      <p>{item.description}</p>
+
+                      <p className="mt-2 font-medium">
+                        € {item.price}
+                      </p>
+
+                      <p>
+                        {item.available ? "Available" : "Unavailable"}
+                      </p>
+
+                      <button
+                          className="mt-3 bg-blue-500 text-white px-4 py-2 rounded"
+                          onClick={() =>
+                              addItem({
+                                restaurantId: restaurant.id,
+                                restaurantName: restaurant.name,
+                                item: {
+                                  id: item.id,
+                                  name: item.name,
+                                  priceCents: Math.round(item.price * 100),
+                                },
+                              })
+                          }
+                      >
+                        Add to Cart
+                      </button>
+                    </div>
+                ))}
+              </div>
+          )}
         </section>
       ) : (
         <MenuSection items={foodItems} restaurant={restaurant} />

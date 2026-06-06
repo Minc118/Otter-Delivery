@@ -3,26 +3,7 @@ import { getRestaurants } from "../../services/catalogService.js";
 import EmptyState from "../ui/EmptyState.jsx";
 import RestaurantCard from "./RestaurantCard.jsx";
 
-export default function RestaurantGrid() {
-  const [restaurants, setRestaurants] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    async function loadRestaurants() {
-      try {
-        const data = await getRestaurants();
-        setRestaurants(data);
-      } catch (err) {
-        setError("Restaurants could not be loaded.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadRestaurants();
-  }, []);
-
+export default function RestaurantGrid({ restaurants, loading, error }) {
   if (loading) {
     return (
       <div className="bg-surface-container-lowest border border-surface rounded-xl">

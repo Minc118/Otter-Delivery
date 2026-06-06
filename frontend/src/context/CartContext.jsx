@@ -12,8 +12,8 @@ import { getCartItemCount } from "../utils/cartTotals.js";
 import { priceToCents } from "../utils/currency.js";
 
 export const CartContext = createContext(null);
-
 export function CartProvider({ children }) {
+  const [cartWarning, setCartWarning] = useState(null);
   const initialCartGroups = getInitialCartGroups();
   const deliveryFeeCents = getDeliveryFeeCents();
   const [cartGroups, setCartGroups] = useState(initialCartGroups);
@@ -67,6 +67,21 @@ export function CartProvider({ children }) {
       restaurantId,
       restaurantName,
     };
+  function addItem({ restaurantId, restaurantName, item }) {
+    const existingGroup = cartGroups[0];
+
+    if (
+        existingGroup &&
+        existingGroup.restaurantId !== restaurantId
+    ) {
+      setCartWarning(
+          `Your cart already contains items from ${existingGroup.restaurantName}. Please clear your cart before ordering from another restaurant.`
+      );
+
+      return;
+    }
+    setCartWarning(null);
+    const unitPriceCents = item.priceCents ?? priceToCents(item.price);
 
     setCartGroups((currentGroups) => {
       const groupIndex = currentGroups.findIndex(
@@ -213,11 +228,37 @@ export function CartProvider({ children }) {
       return null;
     }
 
-    const placedOrder = createMockPlacedOrder({
-      deliveryFeeCents,
-      group,
-      paymentMethod,
+    const response = await fetch("http://localhost:8002/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        customerId: 1,
+        restaurantId: group.restaurantId,
+        items: group.items.map((item) => ({
+          menuItemId: item.id,
+          quantity: item.quantity,
+        })),
+      }),
     });
+
+    if (!response.ok) {
+      throw new Error("Failed to create order");
+    }
+
+    const backendOrder = await response.json();
+
+    const placedOrder = {
+      id: backendOrder.id,
+      displayId: `ORDER-${backendOrder.id}`,
+      restaurantId: group.restaurantId,
+      restaurantName: group.restaurantName,
+      items: group.items,
+      paymentMethod,
+      totalCents: Math.round(backendOrder.totalPrice * 100),
+      estimatedDeliveryTime: "approx. 40 min",
+    };
 
     setLastPlacedOrder(placedOrder);
     setCheckoutDraft(null);
@@ -247,26 +288,35 @@ export function CartProvider({ children }) {
   }
 
   const value = useMemo(
-    () => ({
-      addItem,
-      beginCheckout,
-      cartGroups,
-      checkoutDraft,
-      decrementItem,
-      deliveryFeeCents,
-      incrementItem,
-      itemCount,
-      lastPlacedOrder,
-      placeCheckoutOrder,
-      removeItem,
-      removeRestaurant,
-      restaurantCount: cartGroups.length,
-      selectedGroup,
-      selectedRestaurantId: selectedGroup?.restaurantId ?? null,
-      selectRestaurant,
-      updateItemQuantity,
-    }),
-    [cartGroups, checkoutDraft, itemCount, lastPlacedOrder, selectedGroup],
+      () => ({
+        addItem,
+        beginCheckout,
+        cartGroups,
+        checkoutDraft,
+        decrementItem,
+        deliveryFeeCents,
+        incrementItem,
+        itemCount,
+        lastPlacedOrder,
+        placeCheckoutOrder,
+        removeItem,
+        removeRestaurant,
+        restaurantCount: cartGroups.length,
+        selectedGroup,
+        selectedRestaurantId: selectedGroup?.restaurantId ?? null,
+        selectRestaurant,
+        updateItemQuantity,
+        cartWarning,
+        setCartWarning,
+      }),
+      [
+        cartGroups,
+        checkoutDraft,
+        itemCount,
+        lastPlacedOrder,
+        selectedGroup,
+        cartWarning,
+      ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
