@@ -1,14 +1,20 @@
 from decimal import Decimal
+from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app import models
 from app.config import Settings
 from app.errors import InvalidInputError
+from app.repositories import memory_store
 from app.repositories import preferences as preference_repository
 from app.repositories import recommendations as recommendation_repository
 from app.schemas import (
+    FeedbackCreateRequest,
+    FeedbackCreateResponse,
     RecommendationFeedback,
     RecommendationFeedbackCreate,
     RecommendationHistory,
@@ -16,61 +22,109 @@ from app.schemas import (
     RecommendationRequestCreate,
     RecommendationRequestRecord,
     RecommendationResponse,
+    RestaurantRecommendationRequest,
+    RestaurantRecommendationResponse,
+    RestaurantRecommendationItem,
     UserPreference,
     UserPreferencePayload,
 )
-from app.services.llm_provider import LLMRecommendationProvider, MockLLMRecommendationProvider
+from app.services.llm_provider import (
+    GeminiReranker,
+    LLMRecommendationProvider,
+    MockLLMRecommendationProvider,
+)
+from app.services.order_client import MockOrderClient, OrderClient
 from app.services.restaurant_client import HttpRestaurantCatalogClient, RestaurantCatalogClient
+from app.services.scoring import ScoredCandidate, score_restaurants
 
 
 class RecommendationService:
     def __init__(
         self,
-        db: Session,
+        db: Session | None,
         settings: Settings,
         restaurant_client: RestaurantCatalogClient | None = None,
         llm_provider: LLMRecommendationProvider | None = None,
+        order_client: OrderClient | None = None,
     ):
         self.db = db
         self.settings = settings
         self.restaurant_client = restaurant_client or HttpRestaurantCatalogClient(settings)
         self.llm_provider = llm_provider or MockLLMRecommendationProvider()
+        self.gemini_reranker = GeminiReranker(settings)
+        self.order_client = order_client or MockOrderClient()
 
     def get_preference(self, user_id: str) -> UserPreference | None:
+        if self.db is None:
+            memory_preference = memory_store.get_preference(user_id)
+            return _memory_preference_to_schema(memory_preference) if memory_preference else None
+
         preference = preference_repository.get_user_preference(self.db, user_id)
         if preference is None:
             return None
         return _preference_to_schema(preference)
 
     def upsert_preference(self, user_id: str, payload: UserPreferencePayload) -> UserPreference:
+        if self.db is None:
+            record = memory_store.save_preference(user_id, payload.model_dump(mode="json"))
+            return _memory_preference_to_schema(record)
+
         preference = preference_repository.upsert_user_preference(self.db, user_id, payload)
         return _preference_to_schema(preference)
 
     def create_recommendations(self, payload: RecommendationRequestCreate) -> RecommendationResponse:
-        stored_preference = preference_repository.get_user_preference(self.db, payload.user_id)
-        stored_preferences = _preference_to_dict(stored_preference) if stored_preference else {}
+        stored_preferences = self._stored_preferences(payload.user_id)
         request_preferences = (
             payload.preferences.model_dump(mode="json") if payload.preferences is not None else {}
         )
         effective_preferences = _merge_preferences(stored_preferences, request_preferences)
 
         restaurants = self.restaurant_client.fetch_catalog()
-        recommendations = self.llm_provider.recommend(
+        candidates = score_restaurants(
             user_id=payload.user_id,
-            language=payload.language,
-            free_text=payload.free_text,
+            query=payload.free_text,
             preferences=effective_preferences,
             restaurants=restaurants,
+            limit=5,
         )
+        recommendations = [candidate.to_legacy_result() for candidate in candidates]
 
-        request, results = recommendation_repository.create_request_with_results(
-            self.db,
+        if self.db is None:
+            request_id = uuid4()
+            memory_store.save_history(
+                {
+                    "request_id": str(request_id),
+                    "user_id": payload.user_id,
+                    "query": payload.free_text,
+                    "preferences": request_preferences,
+                    "recommended_restaurants": [item.to_public_dict() for item in candidates],
+                    "source": "fallback",
+                }
+            )
+            return RecommendationResponse(
+                request_id=request_id,
+                user_id=payload.user_id,
+                recommendations=[
+                    RecommendationItem(
+                        recommendation_result_id=uuid4(),
+                        restaurant_id=item.restaurant_id,
+                        restaurant_name=item.restaurant_name,
+                        food_item_id=item.menu_item_ids[0] if item.menu_item_ids else item.restaurant_id,
+                        food_item_name=item.recommended_items[0] if item.recommended_items else item.restaurant_name,
+                        reason=item.reason,
+                        tags=item.matched_factors,
+                        score=item.recommendation_score,
+                    )
+                    for item in candidates
+                ],
+            )
+
+        request, results = self._persist_request_results(
             user_id=payload.user_id,
             language=payload.language,
-            free_text=payload.free_text,
+            query=payload.free_text,
             request_preferences=request_preferences,
             stored_preferences=stored_preferences,
-            restaurant_service_url=self.settings.restaurant_service_url,
             recommendations=recommendations,
         )
 
@@ -80,7 +134,65 @@ class RecommendationService:
             recommendations=[_result_to_schema(result) for result in results],
         )
 
+    def create_restaurant_recommendations(
+        self,
+        payload: RestaurantRecommendationRequest,
+    ) -> RestaurantRecommendationResponse:
+        stored_preferences = self._stored_preferences(payload.user_id)
+        request_preferences = payload.preferences.model_dump(mode="json")
+        effective_preferences = _merge_preferences(stored_preferences, request_preferences)
+        _ = self.order_client.get_order_history(payload.user_id)
+
+        restaurants = self.restaurant_client.fetch_catalog()
+        catalog_fallback = bool(getattr(self.restaurant_client, "used_fallback", False))
+        candidates = score_restaurants(
+            user_id=payload.user_id,
+            query=payload.query,
+            preferences=effective_preferences,
+            restaurants=restaurants,
+            feedback_by_restaurant=self._feedback_by_restaurant(payload.user_id),
+            limit=20,
+        )
+
+        source = "fallback"
+        final_candidates = candidates
+        if self.gemini_reranker.enabled:
+            try:
+                final_candidates = self.gemini_reranker.rerank(
+                    query=payload.query,
+                    preferences=effective_preferences,
+                    candidates=candidates[:20],
+                )
+                source = "hybrid"
+            except Exception:
+                final_candidates = candidates
+                source = "fallback"
+
+        public_candidates = final_candidates[:5]
+        if catalog_fallback and source == "fallback":
+            source = "fallback"
+
+        self._store_recommendation_run(
+            user_id=payload.user_id,
+            query=payload.query,
+            request_preferences=request_preferences,
+            stored_preferences=stored_preferences,
+            candidates=public_candidates,
+            source=source,
+        )
+
+        return RestaurantRecommendationResponse(
+            recommendations=[
+                RestaurantRecommendationItem(**candidate.to_public_dict())
+                for candidate in public_candidates
+            ],
+            source=source,
+        )
+
     def get_history(self, user_id: str) -> RecommendationHistory | None:
+        if self.db is None:
+            return None
+
         requests = recommendation_repository.get_history_by_user(self.db, user_id)
         if not requests:
             return None
@@ -107,6 +219,9 @@ class RecommendationService:
         recommendation_result_id,
         payload: RecommendationFeedbackCreate,
     ) -> RecommendationFeedback | None:
+        if self.db is None:
+            return None
+
         result = recommendation_repository.get_recommendation_result(self.db, recommendation_result_id)
         if result is None:
             return None
@@ -129,6 +244,141 @@ class RecommendationService:
             feedback_type=feedback.feedback_type,
             comment=feedback.comment,
             created_at=feedback.created_at,
+        )
+
+    def create_mvp_feedback(self, payload: FeedbackCreateRequest) -> FeedbackCreateResponse:
+        recommendation_result_id = payload.recommendation_id
+        if self.db is not None:
+            try:
+                if recommendation_result_id is not None:
+                    result = recommendation_repository.get_recommendation_result(
+                        self.db,
+                        recommendation_result_id,
+                    )
+                    if result is None:
+                        recommendation_result_id = None
+                feedback = recommendation_repository.create_loose_feedback(
+                    self.db,
+                    recommendation_result_id=recommendation_result_id,
+                    user_id=payload.user_id,
+                    restaurant_id=payload.restaurant_id,
+                    feedback_type=payload.feedback_type,
+                    comment=payload.comment,
+                )
+                return FeedbackCreateResponse(
+                    id=feedback.id,
+                    user_id=feedback.user_id,
+                    recommendation_id=feedback.recommendation_result_id,
+                    restaurant_id=feedback.restaurant_id,
+                    feedback_type=feedback.feedback_type or payload.feedback_type,
+                    comment=feedback.comment,
+                    stored=True,
+                )
+            except SQLAlchemyError:
+                pass
+
+        stored = memory_store.save_feedback(payload.model_dump(mode="json"))
+        return FeedbackCreateResponse(
+            id=stored["id"],
+            user_id=payload.user_id,
+            recommendation_id=payload.recommendation_id,
+            restaurant_id=payload.restaurant_id,
+            feedback_type=payload.feedback_type,
+            comment=payload.comment,
+            stored=False,
+        )
+
+    def _stored_preferences(self, user_id: str) -> dict[str, Any]:
+        if self.db is None:
+            preference = memory_store.get_preference(user_id)
+            return _memory_preference_to_dict(preference) if preference else {}
+
+        try:
+            stored_preference = preference_repository.get_user_preference(self.db, user_id)
+        except SQLAlchemyError:
+            return {}
+        return _preference_to_dict(stored_preference) if stored_preference else {}
+
+    def _feedback_by_restaurant(self, user_id: str) -> dict[str, str]:
+        feedback: dict[str, str] = {}
+        for record in memory_store.FEEDBACK:
+            if record.get("user_id") == user_id and record.get("restaurant_id"):
+                feedback[str(record["restaurant_id"])] = str(record.get("feedback_type") or "")
+        return feedback
+
+    def _persist_request_results(
+        self,
+        *,
+        user_id: str,
+        language: str,
+        query: str | None,
+        request_preferences: dict[str, Any],
+        stored_preferences: dict[str, Any],
+        recommendations: list[dict[str, Any]],
+    ):
+        return recommendation_repository.create_request_with_results(
+            self.db,
+            user_id=user_id,
+            language=language,
+            free_text=query,
+            request_preferences=request_preferences,
+            stored_preferences=stored_preferences,
+            restaurant_service_url=self.settings.restaurant_service_url,
+            recommendations=recommendations,
+        )
+
+    def _store_recommendation_run(
+        self,
+        *,
+        user_id: str,
+        query: str | None,
+        request_preferences: dict[str, Any],
+        stored_preferences: dict[str, Any],
+        candidates: list[ScoredCandidate],
+        source: str,
+    ) -> None:
+        legacy_results = [candidate.to_legacy_result() for candidate in candidates]
+        request_id = None
+        if self.db is not None:
+            try:
+                request, _ = self._persist_request_results(
+                    user_id=user_id,
+                    language=str(stored_preferences.get("language") or "en"),
+                    query=query,
+                    request_preferences=request_preferences,
+                    stored_preferences=stored_preferences,
+                    recommendations=legacy_results,
+                )
+                request_id = request.id
+                recommendation_repository.create_training_events(
+                    self.db,
+                    request_id=request_id,
+                    user_id=user_id,
+                    query=query,
+                    source=source,
+                    events=[
+                        candidate.to_training_event(user_id, query, source)
+                        for candidate in candidates
+                    ],
+                )
+                return
+            except SQLAlchemyError:
+                pass
+
+        memory_store.save_history(
+            {
+                "user_id": user_id,
+                "query": query,
+                "preferences": request_preferences,
+                "recommended_restaurants": [candidate.to_public_dict() for candidate in candidates],
+                "source": source,
+            }
+        )
+        memory_store.save_training_events(
+            [
+                candidate.to_training_event(user_id, query, source)
+                for candidate in candidates
+            ]
         )
 
 
@@ -168,6 +418,45 @@ def _preference_to_schema(preference: models.UserPreference) -> UserPreference:
         created_at=preference.created_at,
         updated_at=preference.updated_at,
     )
+
+
+def _memory_preference_to_dict(preference: dict[str, Any] | None) -> dict[str, Any]:
+    if not preference:
+        return {}
+    return {
+        "language": preference.get("language", "en"),
+        "dietary_preferences": preference.get("dietary_preferences", []),
+        "cuisine_preferences": preference.get("cuisine_preferences", []),
+        "allergens": preference.get("allergens", []),
+        "disliked_ingredients": preference.get("disliked_ingredients", []),
+        "max_price": preference.get("max_price"),
+        "metadata": preference.get("metadata", {}),
+    }
+
+
+def _memory_preference_to_schema(preference: dict[str, Any]) -> UserPreference:
+    created_at = _parse_datetime(preference.get("created_at"))
+    updated_at = _parse_datetime(preference.get("updated_at"))
+    return UserPreference(
+        user_id=preference["user_id"],
+        language=preference.get("language", "en"),
+        dietary_preferences=preference.get("dietary_preferences", []),
+        cuisine_preferences=preference.get("cuisine_preferences", []),
+        allergens=preference.get("allergens", []),
+        disliked_ingredients=preference.get("disliked_ingredients", []),
+        max_price=preference.get("max_price"),
+        metadata=preference.get("metadata", {}),
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
+def _parse_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return datetime.utcnow()
 
 
 def _result_to_schema(result: models.RecommendationResult) -> RecommendationItem:

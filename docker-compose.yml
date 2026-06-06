@@ -10,7 +10,9 @@ services:
       - frontend_node_modules:/app/frontend/node_modules
     environment:
       VITE_DRIVER_API_URL: http://localhost:${DRIVER_SERVICE_PORT:-8003}
+      VITE_RESTAURANT_SERVICE_URL: http://localhost:8080
       VITE_RECOMMENDATION_API_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
+      VITE_RECOMMENDATION_SERVICE_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
     depends_on:
       - driver-service
       - recommendation-service
@@ -38,7 +40,12 @@ services:
       RECOMMENDATION_DATABASE_URL: ${RECOMMENDATION_DATABASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      RESTAURANT_SERVICE_URL: ${RESTAURANT_SERVICE_URL:-http://restaurant-service:8001}
+      GEMINI_ENABLED: ${GEMINI_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_CANDIDATE_LIMIT: ${GEMINI_CANDIDATE_LIMIT:-5}
+      GEMINI_MENU_ITEM_LIMIT: ${GEMINI_MENU_ITEM_LIMIT:-3}
+      RESTAURANT_SERVICE_URL: http://host.docker.internal:8080
 
   # Placeholder teammate services, not implemented yet:
   # restaurant-service:

@@ -1,19 +1,23 @@
 import { Link } from "react-router-dom";
 
 export default function RecommendationCard({ recommendation }) {
+  const image = recommendation.image ?? { alt: recommendation.title, src: "" };
+  const badge = recommendation.badge ?? { icon: "auto_awesome", label: "AI Pick" };
+  const tags = recommendation.tags ?? [];
+
   return (
     <article className="bg-surface-light rounded-xl overflow-hidden border border-surface flex flex-col hover:ai-shadow hover:border-primary-light transition-all duration-300">
       <div className="h-48 relative">
         <img
-          alt={recommendation.image.alt}
+          alt={image.alt}
           className="w-full h-full object-cover"
-          src={recommendation.image.src}
+          src={image.src}
         />
         <div className="absolute top-4 left-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full font-metadata text-metadata flex items-center gap-1 shadow-sm">
           <span className="material-symbols-outlined text-sm">
-            {recommendation.badge.icon}
+            {badge.icon}
           </span>
-          {recommendation.badge.label}
+          {badge.label}
         </div>
       </div>
       <div className="p-6 flex flex-col flex-grow">
@@ -34,7 +38,7 @@ export default function RecommendationCard({ recommendation }) {
           </p>
         </div>
         <div className="flex gap-2 mb-6">
-          {recommendation.tags.map((tag) => (
+          {tags.map((tag) => (
             <span
               className="bg-surface text-on-surface-variant px-2 py-1 rounded font-metadata text-[12px]"
               key={tag}
