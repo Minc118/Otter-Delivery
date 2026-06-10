@@ -1,0 +1,17 @@
+server:
+  port: 8005
+
+# Restaurant service configuration
+restaurant-service:
+  base-url: http://localhost:8080/api
+
+# DeepL API configuration
+deepl:
+  api-key: ${DEEPL_API_KEY}
+  base-url: https://api-free.deepl.com/v2/translate
+  # For paid plan, use: https://api.deepl.com/v2/translate
+
+# Cache configuration
+cache:
+  caffeine:
+    spec: maximumSize=500,expireAfterAccess=10m
