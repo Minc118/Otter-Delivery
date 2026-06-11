@@ -9,10 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.List;
 
-/**
- * DTO for translated restaurant response.
- * Only name and description fields are translated.
- */
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

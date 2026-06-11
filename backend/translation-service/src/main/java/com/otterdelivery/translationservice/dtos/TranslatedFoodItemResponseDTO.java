@@ -6,17 +6,13 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
-/**
- * DTO for translated food item response.
- * Only name and description fields are translated.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class TranslatedFoodItemResponseDTO {
     private Long id;
-    private String name; // translated
-    private String description; // translated
+    private String name;
+    private String description;
     private java.math.BigDecimal price;
     private boolean available;
     private int preparationTimeMinutes;

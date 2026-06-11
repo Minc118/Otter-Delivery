@@ -21,9 +21,7 @@ public class RestaurantClient {
 
     private final WebClient webClient;
 
-    public RestaurantClient(
-            @Qualifier("restaurantWebClient")
-            WebClient webClient) {
+    public RestaurantClient(@Qualifier("restaurantWebClient") WebClient webClient) {
         this.webClient = webClient;
     }
 
@@ -127,98 +125,6 @@ public class RestaurantClient {
                 .onErrorResume(e -> {
                     log.warn("Failed to fetch available food items: {}", e.getMessage());
                     return Flux.empty();
-                });
-    }
-
-    public Mono<RestaurantResponseDTO> createRestaurant(RestaurantResponseDTO restaurant) {
-        return webClient.post()
-                .uri(baseUrl + "/restaurants")
-                .bodyValue(restaurant)
-                .retrieve()
-                .bodyToMono(RestaurantResponseDTO.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to create restaurant: {}", e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    public Mono<RestaurantResponseDTO> updateRestaurant(Long id, RestaurantResponseDTO restaurant) {
-        return webClient.put()
-                .uri(baseUrl + "/restaurants/{id}", id)
-                .bodyValue(restaurant)
-                .retrieve()
-                .bodyToMono(RestaurantResponseDTO.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to update restaurant with id {}: {}", id, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    public Mono<Void> deleteRestaurant(Long id) {
-        return webClient.delete()
-                .uri(baseUrl + "/restaurants/{id}", id)
-                .retrieve()
-                .bodyToMono(Void.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to delete restaurant with id {}: {}", id, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    public Mono<RestaurantResponseDTO> patchRestaurantStatus(Long id, boolean open) {
-        return webClient.patch()
-                .uri(baseUrl + "/restaurants/{id}/status?open={open}", id, open)
-                .retrieve()
-                .bodyToMono(RestaurantResponseDTO.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to patch restaurant status for id {}: {}", id, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    public Mono<FoodItemResponseDTO> createFoodItem(Long categoryId, FoodItemResponseDTO foodItem) {
-        return webClient.post()
-                .uri(baseUrl + "/food-items/categories/{categoryId}", categoryId)
-                .bodyValue(foodItem)
-                .retrieve()
-                .bodyToMono(FoodItemResponseDTO.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to create food item for category id {}: {}", categoryId, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    public Mono<FoodItemResponseDTO> updateFoodItem(Long id, FoodItemResponseDTO foodItem) {
-        return webClient.put()
-                .uri(baseUrl + "/food-items/{id}", id)
-                .bodyValue(foodItem)
-                .retrieve()
-                .bodyToMono(FoodItemResponseDTO.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to update food item with id {}: {}", id, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    public Mono<Void> deleteFoodItem(Long id) {
-        return webClient.delete()
-                .uri(baseUrl + "/food-items/{id}", id)
-                .retrieve()
-                .bodyToMono(Void.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to delete food item with id {}: {}", id, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    public Mono<FoodItemResponseDTO> patchFoodItemAvailability(Long id, boolean available) {
-        return webClient.patch()
-                .uri(baseUrl + "/food-items/{id}/availability?available={available}", id, available)
-                .retrieve()
-                .bodyToMono(FoodItemResponseDTO.class)
-                .onErrorResume(e -> {
-                    log.warn("Failed to patch food item availability for id {}: {}", id, e.getMessage());
-                    return Mono.empty();
                 });
     }
 }

@@ -9,9 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
-/**
- * Configuration for WebClient beans.
- */
+
 @Configuration
 @Slf4j
 public class WebClientConfig {

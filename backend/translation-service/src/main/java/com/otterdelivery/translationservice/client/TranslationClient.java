@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -20,12 +21,13 @@ public class TranslationClient {
     }
 
     @Value("${deepl.api-key}")
-    private String apiKey;
+    private String apiKey;//4d5630f6-1b57-4929-8090-68699547b001:fx
 
     @Value("${deepl.base-url}")
     private String baseUrl;
 
-
+    //@Cacheable(cacheNames = "translations", key = "#targetLang + '::' + #text")
+    @Cacheable(cacheNames = "translations", key = "#text + '::' + #targetLang")
     public Mono<String> translate(String text, String targetLang) {
         if (text == null || text.isBlank() || targetLang == null || targetLang.isBlank()) {
             return Mono.just(text);

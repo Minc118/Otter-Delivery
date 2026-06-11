@@ -8,9 +8,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
-/**
- * Global exception handler for the translation service.
- */
+
 @ControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
