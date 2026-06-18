@@ -11,6 +11,9 @@ import { assignDriverToOrder } from "../services/driverService.js";
 import { getCartItemCount } from "../utils/cartTotals.js";
 import { priceToCents } from "../utils/currency.js";
 
+const ORDER_SERVICE_BASE_URL =
+  import.meta.env.VITE_ORDER_SERVICE_URL ?? "http://localhost:8002";
+
 export const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [cartWarning, setCartWarning] = useState(null);
@@ -219,7 +222,7 @@ export function CartProvider({ children }) {
       return null;
     }
 
-    const response = await fetch("http://localhost:8002/orders", {
+    const response = await fetch(`${ORDER_SERVICE_BASE_URL}/orders`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
