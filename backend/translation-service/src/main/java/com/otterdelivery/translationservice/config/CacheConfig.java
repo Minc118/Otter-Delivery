@@ -25,7 +25,7 @@ public class CacheConfig {
 
     @Bean
     public Caffeine<Object, Object> caffeineCacheBuilder() {
-        // Parse the cache spec from application.yml
+        // Parse the cache spec from application.properties
         // Format: maximumSize=500,expireAfterAccess=10m
         Caffeine<Object, Object> caffeine = Caffeine.newBuilder();
 

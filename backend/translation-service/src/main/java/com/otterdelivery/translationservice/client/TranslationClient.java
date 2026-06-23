@@ -21,7 +21,7 @@ public class TranslationClient {
     }
 
     @Value("${deepl.api-key}")
-    private String apiKey;//4d5630f6-1b57-4929-8090-68699547b001:fx
+    private String apiKey;
 
     @Value("${deepl.base-url}")
     private String baseUrl;
