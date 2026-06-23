@@ -28,6 +28,57 @@ class UserPreferencePayload(ApiModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class RestaurantPreferencePayload(ApiModel):
+    dietary: list[str] = Field(default_factory=list)
+    price_range: str | None = None
+    favorite_cuisines: list[str] = Field(default_factory=list)
+    allergies: list[str] = Field(default_factory=list)
+
+
+class PreferenceUpsertRequest(UserPreferencePayload):
+    user_id: str = Field(..., min_length=1, max_length=128)
+
+
+class RestaurantRecommendationRequest(ApiModel):
+    user_id: str = Field(..., min_length=1, max_length=128)
+    query: str | None = Field(default=None, min_length=1, max_length=2000)
+    preferences: RestaurantPreferencePayload = Field(default_factory=RestaurantPreferencePayload)
+
+
+class RestaurantRecommendationItem(ApiModel):
+    restaurant_id: str
+    restaurant_name: str
+    recommendation_score: float
+    completion_score: float
+    reason: str
+    recommended_items: list[str]
+    matched_factors: list[str] = Field(default_factory=list)
+    negative_factors: list[str] = Field(default_factory=list)
+
+
+class RestaurantRecommendationResponse(ApiModel):
+    recommendations: list[RestaurantRecommendationItem]
+    source: Literal["llm", "fallback", "hybrid"]
+
+
+class FeedbackCreateRequest(ApiModel):
+    user_id: str = Field(..., min_length=1, max_length=128)
+    recommendation_id: UUID | None = None
+    restaurant_id: str | None = Field(default=None, max_length=128)
+    feedback_type: Literal["like", "dislike", "clicked", "ordered", "skipped", "not_relevant", "other"]
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+class FeedbackCreateResponse(ApiModel):
+    id: UUID | str
+    user_id: str
+    recommendation_id: UUID | None = None
+    restaurant_id: str | None = None
+    feedback_type: str
+    comment: str | None = None
+    stored: bool
+
+
 class UserPreference(ApiModel):
     user_id: str
     language: str
@@ -93,7 +144,7 @@ class RecommendationHistory(ApiModel):
 class RecommendationFeedbackCreate(ApiModel):
     user_id: str = Field(..., min_length=1, max_length=128)
     rating: int | None = Field(default=None, ge=1, le=5)
-    feedback_type: Literal["like", "dislike", "not_relevant", "ordered", "other"] | None = None
+    feedback_type: Literal["like", "dislike", "clicked", "ordered", "skipped", "not_relevant", "other"] | None = None
     comment: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")

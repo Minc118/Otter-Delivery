@@ -10,6 +10,8 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
 
     List<Restaurant> findByOpenTrue();
 
+    List<Restaurant> findByNameIgnoreCase(String name);
+
     @Query("SELECT r FROM Restaurant r WHERE LOWER(r.name) LIKE LOWER(CONCAT('%', :name, '%'))")
     List<Restaurant> findByNameContainingIgnoreCase(@Param("name") String name);
 }

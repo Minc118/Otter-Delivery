@@ -1,9 +1,15 @@
 import useCart from "../../hooks/useCart.js";
+import {
+  toCartItemViewModel,
+  toRestaurantCartMeta,
+} from "../../services/restaurantAdapter.js";
 
 export default function MenuItemCard({ item, restaurant }) {
   const { addItem } = useCart();
   const restaurantName = restaurant?.name ?? "Green Bowl House";
-  const restaurantId = restaurant?.id ?? "green-bowl-house";
+  const restaurantId =
+    restaurant?.restaurantId ?? restaurant?.id ?? "green-bowl-house";
+  const restaurantMeta = toRestaurantCartMeta(restaurant);
   const cardClass = item.aiRecommended
     ? "bg-surface-light border border-surface-light"
     : "bg-surface-container-lowest border border-surface hover:border-primary-light";
@@ -47,7 +53,13 @@ export default function MenuItemCard({ item, restaurant }) {
             addItem({
               restaurantId,
               restaurantName,
-              item,
+              restaurantMeta,
+              item: {
+                ...toCartItemViewModel(item),
+                restaurantId,
+                restaurantName,
+                restaurantMeta,
+              },
             })
           }
           type="button"

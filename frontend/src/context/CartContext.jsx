@@ -49,21 +49,35 @@ export function CartProvider({ children }) {
     return groups.filter((group) => group.items.length > 0);
   }
 
-  function addItem({ restaurantId, restaurantName, item }) {
+  function addItem({ restaurantId, restaurantName, restaurantMeta, item }) {
+    const itemId = String(item.id ?? item.menuItemId ?? item.foodItemId);
+    const unitPriceCents =
+      item.unitPriceCents ?? item.priceCents ?? priceToCents(item.price);
+    const cartItem = {
+      id: itemId,
+      foodItemId: item.foodItemId,
+      menuItemId: item.menuItemId,
+      name: item.name,
+      description: item.description,
+      quantity: 1,
+      unitPriceCents,
+      price: item.price,
+      image: item.image,
+      currency: item.currency,
+      restaurantId,
+      restaurantName,
+    };
     const existingGroup = cartGroups[0];
 
-    if (
-        existingGroup &&
-        existingGroup.restaurantId !== restaurantId
-    ) {
+    if (existingGroup && existingGroup.restaurantId !== restaurantId) {
       setCartWarning(
-          `Your cart already contains items from ${existingGroup.restaurantName}. Please clear your cart before ordering from another restaurant.`
+        `Your cart already contains items from ${existingGroup.restaurantName}. Please clear your cart before ordering from another restaurant.`,
       );
 
       return;
     }
+
     setCartWarning(null);
-    const unitPriceCents = item.priceCents ?? priceToCents(item.price);
 
     setCartGroups((currentGroups) => {
       const groupIndex = currentGroups.findIndex(
@@ -76,14 +90,8 @@ export function CartProvider({ children }) {
           {
             restaurantId,
             restaurantName,
-            items: [
-              {
-                id: item.id,
-                name: item.name,
-                quantity: 1,
-                unitPriceCents,
-              },
-            ],
+            restaurantMeta,
+            items: [cartItem],
           },
         ];
       }
@@ -93,29 +101,21 @@ export function CartProvider({ children }) {
           return group;
         }
 
-        const existingItem = group.items.find(
-          (cartItem) => cartItem.id === item.id,
-        );
+        const existingItem = group.items.find((item) => item.id === itemId);
 
         if (!existingItem) {
           return {
             ...group,
-            items: [
-              ...group.items,
-              {
-                id: item.id,
-                name: item.name,
-                quantity: 1,
-                unitPriceCents,
-              },
-            ],
+            restaurantMeta: group.restaurantMeta ?? restaurantMeta,
+            items: [...group.items, cartItem],
           };
         }
 
         return {
           ...group,
+          restaurantMeta: group.restaurantMeta ?? restaurantMeta,
           items: group.items.map((cartItem) =>
-            cartItem.id === item.id
+            cartItem.id === itemId
               ? { ...cartItem, quantity: cartItem.quantity + 1 }
               : cartItem,
           ),
@@ -279,35 +279,35 @@ export function CartProvider({ children }) {
   }
 
   const value = useMemo(
-      () => ({
-        addItem,
-        beginCheckout,
-        cartGroups,
-        checkoutDraft,
-        decrementItem,
-        deliveryFeeCents,
-        incrementItem,
-        itemCount,
-        lastPlacedOrder,
-        placeCheckoutOrder,
-        removeItem,
-        removeRestaurant,
-        restaurantCount: cartGroups.length,
-        selectedGroup,
-        selectedRestaurantId: selectedGroup?.restaurantId ?? null,
-        selectRestaurant,
-        updateItemQuantity,
-        cartWarning,
-        setCartWarning,
-      }),
-      [
-        cartGroups,
-        checkoutDraft,
-        itemCount,
-        lastPlacedOrder,
-        selectedGroup,
-        cartWarning,
-      ],
+    () => ({
+      addItem,
+      beginCheckout,
+      cartGroups,
+      checkoutDraft,
+      decrementItem,
+      deliveryFeeCents,
+      incrementItem,
+      itemCount,
+      lastPlacedOrder,
+      placeCheckoutOrder,
+      removeItem,
+      removeRestaurant,
+      restaurantCount: cartGroups.length,
+      selectedGroup,
+      selectedRestaurantId: selectedGroup?.restaurantId ?? null,
+      selectRestaurant,
+      updateItemQuantity,
+      cartWarning,
+      setCartWarning,
+    }),
+    [
+      cartGroups,
+      checkoutDraft,
+      itemCount,
+      lastPlacedOrder,
+      selectedGroup,
+      cartWarning,
+    ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

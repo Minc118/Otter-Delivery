@@ -55,4 +55,9 @@ public class OrderController {
                               @RequestBody OrderStatus status) {
         return orderService.updateStatus(id, status);
     }
+
+    @GetMapping("/customer/{customerId}")
+    public List<Order> getOrdersByCustomer(@PathVariable Long customerId) {
+        return orderService.getOrdersByCustomerId(customerId);
+    }
 }

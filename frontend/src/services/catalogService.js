@@ -1,5 +1,15 @@
-const RESTAURANT_API = "http://localhost:8001/api/restaurants";
-const FOOD_ITEMS_API = "http://localhost:8001/api/food-items";
+import {
+  adaptMenuItems,
+  adaptRestaurant,
+  adaptRestaurants,
+  getFallbackRestaurantViewModel,
+} from "./restaurantAdapter.js";
+
+const RESTAURANT_SERVICE_BASE_URL =
+  import.meta.env.VITE_RESTAURANT_SERVICE_URL ?? "http://localhost:8001";
+
+const RESTAURANT_API = `${RESTAURANT_SERVICE_BASE_URL}/api/restaurants`;
+const FOOD_ITEMS_API = `${RESTAURANT_SERVICE_BASE_URL}/api/food-items`;
 
 export async function getRestaurants() {
   const response = await fetch(RESTAURANT_API);
@@ -8,7 +18,8 @@ export async function getRestaurants() {
     throw new Error("Could not load restaurants");
   }
 
-  return await response.json();
+  const restaurants = await response.json();
+  return adaptRestaurants(restaurants);
 }
 
 export async function getRestaurantById(id) {
@@ -18,21 +29,23 @@ export async function getRestaurantById(id) {
     throw new Error("Restaurant not found");
   }
 
-  return await response.json();
+  const restaurant = await response.json();
+  return adaptRestaurant(restaurant);
 }
 
-export async function getFoodItemsByRestaurantId(restaurantId) {
+export async function getFoodItemsByRestaurantId(restaurantId, restaurant = null) {
   const response = await fetch(
-      `${FOOD_ITEMS_API}/restaurants/${restaurantId}`
+    `${FOOD_ITEMS_API}/restaurants/${restaurantId}`,
   );
 
   if (!response.ok) {
     throw new Error("Could not load food items");
   }
 
-  return await response.json();
+  const foodItems = await response.json();
+  return adaptMenuItems(foodItems, restaurant);
 }
 
 export function getFallbackRestaurant() {
-  return null;
+  return getFallbackRestaurantViewModel();
 }
