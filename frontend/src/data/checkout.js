@@ -1,8 +1,40 @@
 export const checkoutDeliveryAddress = {
-  label: "Home",
-  line1: "123 AI Lane",
-  city: "San Francisco",
-  region: "CA",
+  label: "TU Berlin",
+  line1: "Marchstraße 23",
+  city: "Berlin",
+  postalCode: "10587",
+  region: "Berlin",
+  country: "Germany",
+  note: "Meet at the main entrance",
+  latitude: 52.5164,
+  longitude: 13.3235,
+  coordinateSource: "demo_tu_berlin",
+};
+
+export const demoDeliveryLocations = [
+  {
+    match: ["tu berlin"],
+    latitude: 52.5164,
+    longitude: 13.3235,
+    coordinateSource: "demo_tu_berlin",
+  },
+  {
+    match: ["marchstrasse", "berlin"],
+    latitude: 52.5164,
+    longitude: 13.3235,
+    coordinateSource: "demo_tu_berlin",
+  },
+  {
+    match: ["strasse des 17 juni", "berlin"],
+    latitude: 52.5096,
+    longitude: 13.326,
+    coordinateSource: "demo_ernst_reuter_platz",
+  },
+];
+
+export const defaultRestaurantPickupLocation = {
+  lat: 52.52,
+  lng: 13.405,
 };
 
 export const paymentMethods = [

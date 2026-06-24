@@ -13,6 +13,10 @@
     min-width: 1024px;
   }
 
+  body.tracking-responsive {
+    min-width: 320px;
+  }
+
   button,
   input {
     font: inherit;
@@ -58,4 +62,126 @@
     "wght" 400,
     "GRAD" 0,
     "opsz" 24;
+}
+
+.otter-coordinate-map .leaflet-tile-pane {
+  filter: grayscale(0.18) saturate(0.55) brightness(1.07) contrast(0.88);
+}
+
+.otter-coordinate-map .leaflet-control-zoom,
+.otter-coordinate-map .leaflet-control-attribution {
+  border: 1px solid rgba(91, 112, 110, 0.2);
+  box-shadow: 0 6px 18px rgba(36, 36, 38, 0.08);
+}
+
+.otter-coordinate-map .leaflet-control-zoom a {
+  color: #315c59;
+}
+
+.otter-coordinate-map .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.82);
+  color: #52615f;
+  padding: 2px 6px;
+}
+
+.otter-coordinate-map .leaflet-control-attribution a {
+  color: #315c59;
+}
+
+.otter-leaflet-div-icon {
+  background: transparent;
+  border: 0;
+}
+
+.otter-map-marker {
+  height: 36px;
+  position: relative;
+  width: 36px;
+}
+
+.otter-marker-shape {
+  align-items: center;
+  background: #006c67;
+  border: 3px solid white;
+  box-shadow: 0 4px 14px rgba(36, 59, 58, 0.28);
+  display: flex;
+  height: 34px;
+  justify-content: center;
+  left: 1px;
+  position: absolute;
+  top: 1px;
+  width: 34px;
+}
+
+.otter-marker-label {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(76, 97, 94, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(36, 36, 38, 0.12);
+  color: #242426;
+  font-size: 12px;
+  font-weight: 750;
+  left: 50%;
+  line-height: 1;
+  padding: 5px 8px;
+  position: absolute;
+  top: -28px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.otter-pickup-icon .otter-marker-shape {
+  background: #e59a2f;
+  border-radius: 10px;
+}
+
+.otter-pickup-icon .otter-marker-shape::after {
+  background: white;
+  border-radius: 50%;
+  content: "";
+  height: 8px;
+  width: 8px;
+}
+
+.otter-destination-icon .otter-marker-shape {
+  background: #40536a;
+  border-radius: 9px 9px 9px 2px;
+  transform: rotate(-45deg);
+}
+
+.otter-destination-icon .otter-marker-shape::after {
+  background: white;
+  border-radius: 50%;
+  content: "";
+  height: 8px;
+  width: 8px;
+}
+
+.otter-destination-icon .otter-marker-label {
+  top: -31px;
+}
+
+.otter-driver-icon {
+  transition: transform 500ms linear;
+}
+
+.otter-driver-icon .otter-marker-shape {
+  background: #006c67;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 7px rgba(205, 239, 235, 0.8),
+    0 4px 14px rgba(36, 59, 58, 0.3);
+}
+
+.otter-driver-icon .otter-marker-label {
+  top: 41px;
+}
+
+.otter-driver-arrow {
+  border-bottom: 9px solid white;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  display: block;
+  transform-origin: center;
+  transition: transform 500ms linear;
 }

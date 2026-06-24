@@ -28,6 +28,13 @@ export function assignDriverToOrder(orderId) {
   });
 }
 
+export function estimateDelivery({ orderId, pickupLocation, customerLocation }) {
+  return requestDriverService("/drivers/estimate", {
+    body: JSON.stringify({ orderId, pickupLocation, customerLocation }),
+    method: "POST",
+  });
+}
+
 export function getOrderTracking(orderId) {
   return requestDriverService(`/orders/${orderId}/tracking`);
 }
