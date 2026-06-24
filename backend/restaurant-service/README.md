@@ -29,15 +29,25 @@ RESTAURANT_SERVICE_PORT=8001
 
 ## Demo Seed Data
 
-Development demo data is seeded by `DemoDataSeeder` only when the Spring `dev` profile is active. The seeder first checks `restaurantRepository.count()` and skips seeding if any restaurant already exists.
+Development demo data is seeded by `DemoDataSeeder` only when the Spring `dev` profile is active and `SEED_DEMO_DATA=true`.
+
+The seeder is idempotent per demo record:
+
+- restaurants are matched by case-insensitive name;
+- categories are matched by restaurant and case-insensitive name;
+- menu items are matched by category and case-insensitive name.
+
+Existing matching demo records are updated instead of duplicated. Missing demo records are inserted, which also repairs a partially seeded catalog. Unrelated restaurants, categories, menu items, orders, and user data are not deleted.
 
 Run with seeding enabled:
 
 ```bash
-SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=dev SEED_DEMO_DATA=true mvn spring-boot:run
 ```
 
-The demo catalog contains 10 restaurants and 50 menu items across Japanese, Korean, Turkish, Italian, Indian, Vegan, Chinese, and Mexican options. Item descriptions include useful recommendation terms such as vegetarian, vegan, halal, spicy, gluten-free, warm, cheap/medium/high price signals, and comforting.
+Docker Compose enables both settings for `restaurant-service`, so `docker compose up --build` seeds the catalog automatically.
+
+The demo catalog contains 12 restaurants and 60 menu items across Japanese, Korean, Turkish, Italian, Indian, Vegan, Chinese, Mexican, Thai, Middle Eastern, and Mediterranean options. Item descriptions include useful recommendation terms such as vegetarian, vegan, halal, spicy, gluten-free, warm, cheap/medium/high price signals, and comforting.
 
 ## Recommendation Integration Smoke Test
 

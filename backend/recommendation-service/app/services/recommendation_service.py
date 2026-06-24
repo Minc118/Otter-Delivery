@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.config import Settings
-from app.errors import InvalidInputError
+from app.errors import InvalidInputError, LLMProviderError
 from app.repositories import memory_store
 from app.repositories import preferences as preference_repository
 from app.repositories import recommendations as recommendation_repository
@@ -29,9 +29,15 @@ from app.schemas import (
     UserPreferencePayload,
 )
 from app.services.llm_provider import (
+    GeminiLanguageNormalizer,
     GeminiReranker,
     LLMRecommendationProvider,
     MockLLMRecommendationProvider,
+)
+from app.services.multilingual import (
+    NormalizedRecommendationInput,
+    localize_candidate_reasons,
+    normalize_recommendation_input,
 )
 from app.services.order_client import MockOrderClient, OrderClient
 from app.services.restaurant_client import HttpRestaurantCatalogClient, RestaurantCatalogClient
@@ -51,6 +57,7 @@ class RecommendationService:
         self.settings = settings
         self.restaurant_client = restaurant_client or HttpRestaurantCatalogClient(settings)
         self.llm_provider = llm_provider or MockLLMRecommendationProvider()
+        self.gemini_language_normalizer = GeminiLanguageNormalizer(settings)
         self.gemini_reranker = GeminiReranker(settings)
         self.order_client = order_client or MockOrderClient()
 
@@ -78,15 +85,21 @@ class RecommendationService:
             payload.preferences.model_dump(mode="json") if payload.preferences is not None else {}
         )
         effective_preferences = _merge_preferences(stored_preferences, request_preferences)
+        normalized = self._normalize_input(
+            query=payload.free_text,
+            preferences=effective_preferences,
+            language_hint=payload.language,
+        )
 
         restaurants = self.restaurant_client.fetch_catalog()
         candidates = score_restaurants(
             user_id=payload.user_id,
-            query=payload.free_text,
-            preferences=effective_preferences,
+            query=normalized.canonical_query,
+            preferences=normalized.canonical_preferences,
             restaurants=restaurants,
             limit=5,
         )
+        candidates = self._generate_explanations(candidates, normalized)
         recommendations = [candidate.to_legacy_result() for candidate in candidates]
 
         if self.db is None:
@@ -95,6 +108,7 @@ class RecommendationService:
                 {
                     "request_id": str(request_id),
                     "user_id": payload.user_id,
+                    "language": normalized.original_language,
                     "query": payload.free_text,
                     "preferences": request_preferences,
                     "recommended_restaurants": [item.to_public_dict() for item in candidates],
@@ -121,7 +135,7 @@ class RecommendationService:
 
         request, results = self._persist_request_results(
             user_id=payload.user_id,
-            language=payload.language,
+            language=normalized.original_language,
             query=payload.free_text,
             request_preferences=request_preferences,
             stored_preferences=stored_preferences,
@@ -141,32 +155,28 @@ class RecommendationService:
         stored_preferences = self._stored_preferences(payload.user_id)
         request_preferences = payload.preferences.model_dump(mode="json")
         effective_preferences = _merge_preferences(stored_preferences, request_preferences)
+        normalized = self._normalize_input(
+            query=payload.query,
+            preferences=effective_preferences,
+            language_hint=str(stored_preferences.get("language") or "") or None,
+        )
         _ = self.order_client.get_order_history(payload.user_id)
 
         restaurants = self.restaurant_client.fetch_catalog()
         catalog_fallback = bool(getattr(self.restaurant_client, "used_fallback", False))
         candidates = score_restaurants(
             user_id=payload.user_id,
-            query=payload.query,
-            preferences=effective_preferences,
+            query=normalized.canonical_query,
+            preferences=normalized.canonical_preferences,
             restaurants=restaurants,
             feedback_by_restaurant=self._feedback_by_restaurant(payload.user_id),
             limit=20,
         )
 
         source = "fallback"
-        final_candidates = candidates
-        if self.gemini_reranker.enabled:
-            try:
-                final_candidates = self.gemini_reranker.rerank(
-                    query=payload.query,
-                    preferences=effective_preferences,
-                    candidates=candidates[:20],
-                )
-                source = "hybrid"
-            except Exception:
-                final_candidates = candidates
-                source = "fallback"
+        final_candidates = self._generate_explanations(candidates, normalized)
+        if any(candidate.source == "gemini" for candidate in final_candidates):
+            source = "hybrid"
 
         public_candidates = final_candidates[:5]
         if catalog_fallback and source == "fallback":
@@ -175,6 +185,7 @@ class RecommendationService:
         self._store_recommendation_run(
             user_id=payload.user_id,
             query=payload.query,
+            language=normalized.original_language,
             request_preferences=request_preferences,
             stored_preferences=stored_preferences,
             candidates=public_candidates,
@@ -188,6 +199,48 @@ class RecommendationService:
             ],
             source=source,
         )
+
+    def _normalize_input(
+        self,
+        *,
+        query: str | None,
+        preferences: dict[str, Any],
+        language_hint: str | None,
+    ) -> NormalizedRecommendationInput:
+        deterministic = normalize_recommendation_input(
+            query=query,
+            preferences=preferences,
+            language_hint=language_hint,
+        )
+        if not self.gemini_language_normalizer.enabled:
+            return deterministic
+        try:
+            return self.gemini_language_normalizer.normalize(
+                query=query,
+                preferences=preferences,
+                language_hint=deterministic.original_language,
+            )
+        except LLMProviderError:
+            return deterministic
+
+    def _generate_explanations(
+        self,
+        candidates: list[ScoredCandidate],
+        normalized: NormalizedRecommendationInput,
+    ) -> list[ScoredCandidate]:
+        final_candidates = candidates
+        if self.gemini_reranker.enabled:
+            try:
+                final_candidates = self.gemini_reranker.rerank(
+                    query=normalized.canonical_query,
+                    original_query=normalized.original_query,
+                    target_language=normalized.original_language,
+                    preferences=normalized.canonical_preferences,
+                    candidates=candidates,
+                )
+            except LLMProviderError:
+                final_candidates = candidates
+        return localize_candidate_reasons(final_candidates, normalized.original_language)
 
     def get_history(self, user_id: str) -> RecommendationHistory | None:
         if self.db is None:
@@ -332,6 +385,7 @@ class RecommendationService:
         *,
         user_id: str,
         query: str | None,
+        language: str,
         request_preferences: dict[str, Any],
         stored_preferences: dict[str, Any],
         candidates: list[ScoredCandidate],
@@ -343,7 +397,7 @@ class RecommendationService:
             try:
                 request, _ = self._persist_request_results(
                     user_id=user_id,
-                    language=str(stored_preferences.get("language") or "en"),
+                    language=language,
                     query=query,
                     request_preferences=request_preferences,
                     stored_preferences=stored_preferences,
@@ -368,6 +422,7 @@ class RecommendationService:
         memory_store.save_history(
             {
                 "user_id": user_id,
+                "language": language,
                 "query": query,
                 "preferences": request_preferences,
                 "recommended_restaurants": [candidate.to_public_dict() for candidate in candidates],

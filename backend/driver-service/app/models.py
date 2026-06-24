@@ -81,6 +81,8 @@ class RouteEstimate(APIModel):
     distance_meters: int = Field(ge=0)
     duration_seconds: int = Field(gt=0)
     provider: str
+    route_points: list[Location] = Field(default_factory=list)
+    encoded_polyline: str | None = None
     created_at: datetime
 
 

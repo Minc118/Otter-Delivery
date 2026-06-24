@@ -303,6 +303,7 @@ export function toRestaurantCartMeta(restaurant) {
     priceTier: restaurant.priceTier,
     cuisine: restaurant.cuisine,
     image: restaurant.image,
+    address: restaurant.address ?? restaurant.raw?.address ?? null,
     currency: restaurant.currency ?? CURRENCY,
   };
 }

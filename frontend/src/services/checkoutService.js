@@ -1,6 +1,8 @@
 import {
   checkoutDeliveryAddress,
   checkoutRestaurantMeta,
+  demoDeliveryLocations,
+  defaultRestaurantPickupLocation,
 } from "../data/checkout.js";
 import { getRestaurantSubtotalCents } from "../utils/cartTotals.js";
 
@@ -43,6 +45,110 @@ export function getRestaurantCheckoutMeta(restaurantId, restaurantMeta = null) {
       },
     }
   );
+}
+
+export function getRestaurantPickupLocation(group) {
+  const address = group?.restaurantMeta?.address;
+  const latitude = Number(address?.latitude ?? address?.lat);
+  const longitude = Number(address?.longitude ?? address?.lng);
+
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return { lat: latitude, lng: longitude };
+  }
+
+  return { ...defaultRestaurantPickupLocation };
+}
+
+export function toDriverLocation(address) {
+  const latitude = Number(address?.latitude);
+  const longitude = Number(address?.longitude);
+
+  return {
+    lat: Number.isFinite(latitude)
+      ? latitude
+      : checkoutDeliveryAddress.latitude,
+    lng: Number.isFinite(longitude)
+      ? longitude
+      : checkoutDeliveryAddress.longitude,
+  };
+}
+
+export function resolveDeliveryAddressCoordinates(nextAddress, storedAddress) {
+  const address = {
+    ...nextAddress,
+    label: String(nextAddress.label ?? "").trim(),
+    line1: String(nextAddress.line1 ?? "").trim(),
+    postalCode: String(nextAddress.postalCode ?? "").trim(),
+    city: String(nextAddress.city ?? "").trim(),
+    region: String(nextAddress.region ?? "").trim(),
+    country: String(nextAddress.country ?? "").trim(),
+    note: String(nextAddress.note ?? "").trim(),
+  };
+
+  if (
+    hasSamePhysicalAddress(address, storedAddress) &&
+    hasValidCoordinates(storedAddress)
+  ) {
+    return {
+      ...address,
+      latitude: Number(storedAddress.latitude),
+      longitude: Number(storedAddress.longitude),
+      coordinateSource: storedAddress.coordinateSource ?? "stored",
+    };
+  }
+
+  const searchableAddress = normalizeAddressText(address);
+  const demoLocation = demoDeliveryLocations.find(({ match }) =>
+    match.every((part) => searchableAddress.includes(part)),
+  );
+
+  return {
+    ...address,
+    latitude: demoLocation?.latitude ?? checkoutDeliveryAddress.latitude,
+    longitude: demoLocation?.longitude ?? checkoutDeliveryAddress.longitude,
+    coordinateSource:
+      demoLocation?.coordinateSource ?? "demo_fallback_berlin",
+  };
+}
+
+function hasSamePhysicalAddress(left, right) {
+  if (!right) {
+    return false;
+  }
+
+  const fields = ["line1", "postalCode", "city", "region", "country"];
+  return fields.every(
+    (field) => normalizeAddressPart(left[field]) === normalizeAddressPart(right[field]),
+  );
+}
+
+function hasValidCoordinates(address) {
+  return (
+    Number.isFinite(Number(address?.latitude)) &&
+    Number.isFinite(Number(address?.longitude))
+  );
+}
+
+function normalizeAddressText(address) {
+  return [
+    address.label,
+    address.line1,
+    address.postalCode,
+    address.city,
+    address.region,
+    address.country,
+  ]
+    .map(normalizeAddressPart)
+    .join(" ");
+}
+
+function normalizeAddressPart(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll("ß", "ss")
+    .toLowerCase()
+    .trim();
 }
 
 export function createMockPlacedOrder({

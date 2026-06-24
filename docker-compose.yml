@@ -15,8 +15,32 @@ services:
       VITE_RECOMMENDATION_API_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
       VITE_RECOMMENDATION_SERVICE_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
     depends_on:
+      - restaurant-service
+      - order-service
       - driver-service
       - recommendation-service
+
+  restaurant-service:
+    platform: linux/amd64
+    build:
+      context: ./backend/restaurant-service
+    ports:
+      - "${RESTAURANT_SERVICE_PORT:-8001}:8001"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SEED_DEMO_DATA: "true"
+      SERVER_PORT: 8001
+
+  order-service:
+    build:
+      context: ./backend/order-service
+    ports:
+      - "${ORDER_SERVICE_PORT:-8002}:8002"
+    environment:
+      SERVER_PORT: 8002
+      RESTAURANT_SERVICE_URL: http://restaurant-service:8001
+    depends_on:
+      - restaurant-service
 
   driver-service:
     build:
@@ -46,21 +70,11 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       GEMINI_CANDIDATE_LIMIT: ${GEMINI_CANDIDATE_LIMIT:-5}
       GEMINI_MENU_ITEM_LIMIT: ${GEMINI_MENU_ITEM_LIMIT:-3}
-      RESTAURANT_SERVICE_URL: http://host.docker.internal:8080
+      RESTAURANT_SERVICE_URL: http://restaurant-service:8001
+    depends_on:
+      - restaurant-service
 
   # Placeholder teammate services, not implemented yet:
-  # restaurant-service:
-  #   build:
-  #     context: ./backend/restaurant-service
-  #   ports:
-  #     - "8001:8001"
-  #
-  # order-service:
-  #   build:
-  #     context: ./backend/order-service
-  #   ports:
-  #     - "8002:8002"
-  #
   # translation-service:
   #   build:
   #     context: ./backend/translation-service

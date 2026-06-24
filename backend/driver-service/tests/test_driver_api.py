@@ -1,6 +1,9 @@
+import httpx
 from fastapi.testclient import TestClient
 
+from app.models import EstimateRequest, Location
 from app.repositories.memory_repository import MemoryDriverRepository
+from app.services.route_estimator import RouteEstimator
 
 
 def assert_error_shape(response, code: str) -> None:
@@ -125,6 +128,96 @@ def test_estimate_returns_mock_distance_and_eta(client: TestClient) -> None:
     assert payload["etaLabel"] == "approx. 40 min"
     assert payload["estimate"]["provider"] == "mock"
     assert payload["estimate"]["distanceMeters"] > 0
+    assert payload["estimate"]["routePoints"][0] == {"lat": 52.52, "lng": 13.405}
+    assert payload["estimate"]["routePoints"][-1] == {"lat": 52.5, "lng": 13.4}
+    assert payload["estimate"]["encodedPolyline"] is None
+
+
+def test_estimate_uses_driver_already_assigned_to_order(client: TestClient) -> None:
+    assignment = client.post(
+        "/drivers/assign",
+        json={"orderId": "order-route", "driverId": "drv_demo_sam"},
+    ).json()
+
+    response = client.post(
+        "/drivers/estimate",
+        json={
+            "orderId": "order-route",
+            "pickupLocation": {"lat": 52.52, "lng": 13.405},
+            "customerLocation": {"lat": 52.5, "lng": 13.4},
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["driver"]["driverId"] == assignment["driver"]["driverId"]
+
+
+def test_google_routes_provider_is_used_when_configured(
+    repository: MemoryDriverRepository,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["x-goog-fieldmask"] == (
+            "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"
+        )
+        assert request.headers["x-goog-api-key"] == "test-key"
+        return httpx.Response(
+            200,
+            json={
+                "routes": [
+                    {
+                        "distanceMeters": 1234,
+                        "duration": "321.5s",
+                        "polyline": {
+                            "encodedPolyline": "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
+                        },
+                    }
+                ]
+            },
+        )
+
+    estimator = RouteEstimator(
+        repository,
+        google_routes_api_key="test-key",
+        google_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    response = estimator.estimate(
+        EstimateRequest(
+            order_id="google-route",
+            pickup_location=Location(lat=38.5, lng=-120.2),
+            customer_location=Location(lat=43.252, lng=-126.453),
+        )
+    )
+
+    assert response.estimate.provider == "google_routes"
+    assert response.estimate.distance_meters == 1234
+    assert response.estimate.duration_seconds == 322
+    assert len(response.estimate.route_points) == 3
+    assert response.estimate.encoded_polyline is not None
+
+
+def test_google_routes_failure_falls_back_without_failing_request(
+    repository: MemoryDriverRepository,
+) -> None:
+    estimator = RouteEstimator(
+        repository,
+        eta_minutes=40,
+        google_routes_api_key="test-key",
+        google_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(503, json={"error": "unavailable"})
+            )
+        ),
+    )
+    response = estimator.estimate(
+        EstimateRequest(
+            order_id="fallback-route",
+            pickup_location=Location(lat=52.52, lng=13.405),
+            customer_location=Location(lat=52.5, lng=13.4),
+        )
+    )
+
+    assert response.estimate.provider == "mock"
+    assert response.estimated_delivery_time_minutes == 40
 
 
 def test_error_responses_are_consistent(client: TestClient) -> None:

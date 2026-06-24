@@ -8,6 +8,7 @@ import com.otterdelivery.restaurantservice.repository.CategoryRepository;
 import com.otterdelivery.restaurantservice.repository.FoodItemRepository;
 import com.otterdelivery.restaurantservice.repository.RestaurantRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -18,6 +19,7 @@ import java.util.List;
 
 @Configuration
 @Profile("dev")
+@ConditionalOnProperty(name = "seed.demo-data", havingValue = "true")
 public class DemoDataSeeder {
 
     private static final String IMAGE_HEALTHY_BOWL =

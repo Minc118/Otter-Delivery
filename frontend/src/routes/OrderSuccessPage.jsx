@@ -103,6 +103,21 @@ export default function OrderSuccessPage() {
             </ul>
           </div>
 
+          <div className="bg-surface-light rounded-2xl p-5 border border-surface mb-10 text-left relative z-10">
+            <p className="font-metadata text-metadata uppercase tracking-wider text-on-surface-variant mb-2">
+              Delivery to {order.deliveryAddress.label}
+            </p>
+            <p className="text-on-surface">
+              {order.deliveryAddress.line1}, {order.deliveryAddress.postalCode}{" "}
+              {order.deliveryAddress.city}
+            </p>
+            {order.deliveryAddress.note ? (
+              <p className="font-metadata text-metadata text-on-surface-variant mt-2">
+                Note: {order.deliveryAddress.note}
+              </p>
+            ) : null}
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center relative z-10">
             <Link
               className="w-full sm:w-auto bg-primary-container text-on-primary font-button text-button py-4 px-8 rounded-[16px] hover:bg-surface-tint transition-colors duration-200 active:scale-95"

@@ -52,6 +52,11 @@ the following shape:
 Assignment is idempotent by `orderId`. Repeating a successful assignment returns
 the existing assignment and driver without creating another tracking event.
 
+Route estimation uses Google Routes when `GOOGLE_ROUTES_API_KEY` is configured.
+Only distance, duration, and encoded route geometry are requested. If the key is
+missing or the provider request fails, the service returns a deterministic mock
+route instead. The API key is never included in responses or logs.
+
 ## Database migrations
 
 The existing migrations in `migrations/` are retained unchanged. They create the

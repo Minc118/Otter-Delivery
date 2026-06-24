@@ -32,6 +32,18 @@ export default function OrderSummary({ order }) {
         </div>
       </div>
 
+      {order.deliveryAddress ? (
+        <div className="mb-6 rounded-lg bg-surface-light p-3 border border-surface">
+          <p className="font-metadata text-metadata text-on-surface-variant">
+            Delivery to {order.deliveryAddress.label}
+          </p>
+          <p className="font-body-md text-body-md text-on-surface mt-1">
+            {order.deliveryAddress.line1}, {order.deliveryAddress.postalCode}{" "}
+            {order.deliveryAddress.city}
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 mb-6">
         {order.items.map((item) => (
           <div className="flex justify-between items-center gap-4" key={item.id}>

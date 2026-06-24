@@ -6,6 +6,7 @@ import httpx
 
 from app.errors import LLMProviderError
 from app.config import Settings
+from app.services.multilingual import NormalizedRecommendationInput
 from app.services.scoring import ScoredCandidate
 from app.services.restaurant_client import Restaurant
 
@@ -170,6 +171,8 @@ class GeminiReranker:
         self,
         *,
         query: str | None,
+        original_query: str | None = None,
+        target_language: str = "en",
         preferences: dict[str, Any],
         candidates: list[ScoredCandidate],
     ) -> list[ScoredCandidate]:
@@ -197,8 +200,10 @@ class GeminiReranker:
             "Do not invent IDs, names, menu items, prices, availability, or tags. "
             "Return strict JSON with this shape: "
             '{"recommendations":[{"restaurantId":"...","reason":"short user-facing reason"}]}. '
+            f"Write every reason in language code {target_language}. "
             "Rank best candidates first.\n"
-            f"User query: {query or ''}\n"
+            f"Original user query: {original_query or query or ''}\n"
+            f"Canonical English query: {query or ''}\n"
             f"Preferences JSON: {json.dumps(preferences, ensure_ascii=True)}\n"
             f"Candidates JSON: {json.dumps(payload_candidates, ensure_ascii=True)}"
         )
@@ -239,6 +244,9 @@ class GeminiReranker:
         except json.JSONDecodeError as exc:
             logger.warning("gemini_rerank_fallback category=invalid_json")
             raise LLMProviderError("Gemini returned invalid JSON.") from exc
+        if not isinstance(ranked_payload, dict):
+            logger.warning("gemini_rerank_fallback category=invalid_payload")
+            raise LLMProviderError("Gemini returned an invalid payload.")
 
         ranked_ids = _valid_ranked_ids(ranked_payload, limited_candidates)
         if not ranked_ids:
@@ -259,6 +267,8 @@ class GeminiReranker:
             candidate.reason = reason_by_id.get(restaurant_id, candidate.reason)
             candidate.source = "gemini"
             candidate.feature_snapshot["source"] = "gemini"
+            candidate.feature_snapshot["original_language"] = target_language
+            candidate.feature_snapshot["explanation_provider"] = "gemini"
             reranked.append(candidate)
             seen.add(restaurant_id)
 
@@ -269,11 +279,102 @@ class GeminiReranker:
         return reranked
 
 
-def _extract_gemini_text(body: dict[str, Any]) -> str:
+class GeminiLanguageNormalizer:
+    def __init__(self, settings: Settings):
+        self.configured_enabled = settings.gemini_enabled
+        self.api_key = settings.gemini_api_key
+        self.model = settings.gemini_model
+        self.timeout = settings.restaurant_service_timeout_seconds
+
+    @property
+    def enabled(self) -> bool:
+        return self.configured_enabled and bool(self.api_key)
+
+    def normalize(
+        self,
+        *,
+        query: str | None,
+        preferences: dict[str, Any],
+        language_hint: str | None,
+    ) -> NormalizedRecommendationInput:
+        if not self.enabled or not query:
+            raise LLMProviderError("Gemini language normalization is unavailable.")
+
+        prompt = (
+            "Detect the language of a food recommendation request and normalize its intent into "
+            "English catalog labels. Preserve proper names and locations. Do not add preferences "
+            "that the user did not express. Return strict JSON with this shape: "
+            '{"language":"ISO-639-1 code","canonicalQuery":"concise English search labels",'
+            '"preferences":{"dietary":[],"favorite_cuisines":[],"allergies":[],'
+            '"disliked_ingredients":[],"price_range":null}}. '
+            "Use canonical food labels such as spicy, vegetarian, vegan, halal, gluten-free, "
+            "healthy, cheap, Japanese, Chinese, Korean, Thai, Indian, Italian, Turkish, Mexican, "
+            "Mediterranean, pizza, burger, sushi, ramen, noodles, rice, curry, and warm. "
+            "Merge and translate the supplied preferences.\n"
+            f"Language hint: {language_hint or ''}\n"
+            f"User query: {query}\n"
+            f"Preferences JSON: {json.dumps(preferences, ensure_ascii=False)}"
+        )
+        response_payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"},
+        }
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                response = client.post(
+                    url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": self.api_key or "",
+                    },
+                    json=response_payload,
+                )
+                response.raise_for_status()
+                body = response.json()
+            payload = json.loads(_extract_gemini_text(body))
+        except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
+            logger.warning("gemini_language_fallback category=normalization_failed")
+            raise LLMProviderError("Gemini language normalization failed.") from exc
+        if not isinstance(payload, dict):
+            raise LLMProviderError("Gemini returned an invalid normalization payload.")
+
+        language = str(payload.get("language") or language_hint or "en").strip().lower()
+        language = language.replace("_", "-").split("-", 1)[0]
+        if not language.isalpha() or not 2 <= len(language) <= 3:
+            language = str(language_hint or "en")
+        canonical_query = str(payload.get("canonicalQuery") or "").strip()[:2000] or None
+        normalized_preferences = payload.get("preferences")
+        if not isinstance(normalized_preferences, dict):
+            raise LLMProviderError("Gemini returned invalid normalized preferences.")
+
+        merged_preferences = dict(preferences)
+        for key, value in normalized_preferences.items():
+            if value not in (None, [], {}):
+                merged_preferences[key] = value
+
+        return NormalizedRecommendationInput(
+            original_language=language or "en",
+            original_query=query,
+            canonical_query=canonical_query,
+            canonical_preferences=merged_preferences,
+            provider="gemini",
+        )
+
+
+def _extract_gemini_text(body: Any) -> str:
+    if not isinstance(body, dict):
+        raise LLMProviderError("Gemini returned an invalid response.")
     candidates = body.get("candidates") or []
-    if not candidates:
+    if not candidates or not isinstance(candidates[0], dict):
         raise LLMProviderError("Gemini returned no candidates.")
-    parts = candidates[0].get("content", {}).get("parts", [])
+    content = candidates[0].get("content")
+    if not isinstance(content, dict):
+        raise LLMProviderError("Gemini returned invalid content.")
+    parts = content.get("parts", [])
+    if not isinstance(parts, list):
+        raise LLMProviderError("Gemini returned invalid content parts.")
     texts = [part.get("text", "") for part in parts if isinstance(part, dict)]
     text = "\n".join(texts).strip()
     if not text:

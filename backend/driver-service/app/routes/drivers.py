@@ -11,7 +11,7 @@ from app.models import (
     UpdatePositionRequest,
 )
 from app.services.assignment_service import AssignmentService
-from app.services.route_estimator import MockRouteEstimator
+from app.services.route_estimator import RouteEstimator
 
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
@@ -58,6 +58,8 @@ def assign_driver(payload: AssignDriverRequest, request: Request) -> AssignDrive
 
 @router.post("/estimate", response_model=EstimateResponse)
 def estimate(payload: EstimateRequest, request: Request) -> EstimateResponse:
-    return MockRouteEstimator(
-        request.app.state.repository, request.app.state.settings.eta_minutes
+    return RouteEstimator(
+        request.app.state.repository,
+        request.app.state.settings.eta_minutes,
+        request.app.state.settings.google_routes_api_key,
     ).estimate(payload)

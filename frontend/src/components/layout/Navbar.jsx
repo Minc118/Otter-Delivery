@@ -1,12 +1,67 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { getDeliveryTiming } from "../../hooks/useDeliverySimulation.js";
+import { getTrackedDeliveryOrders } from "../../services/trackingState.js";
+
+const DELIVERY_BADGE_CLASS =
+  "hidden md:flex items-center gap-2 rounded-full bg-surface-light px-4 py-2 font-metadata text-metadata";
+const DELIVERED_GRACE_PERIOD_MS = 15 * 60 * 1000;
 
 export default function Navbar({
-  activeOrder,
+  activeOrderId,
   cartItemCount = 0,
   isCartOpen,
+  markDeliveryDelivered,
   onCartClick,
+  trackedOrders,
 }) {
   const location = useLocation();
+  const [now, setNow] = useState(() => Date.now());
+  const trackedDeliveries = useMemo(
+    () => getTrackedDeliveryOrders(trackedOrders),
+    [trackedOrders],
+  );
+  const deliverySummaries = useMemo(
+    () =>
+      trackedDeliveries.map((entry) => ({
+        ...entry,
+        timing: getDeliveryTiming(entry.simulationOrder, now),
+      })),
+    [now, trackedDeliveries],
+  );
+  const activeDeliveries = deliverySummaries.filter(
+    (entry) => entry.timing?.phase !== "DELIVERED",
+  );
+  const activeDelivery =
+    activeDeliveries.find(
+      (entry) => entry.simulationOrder.id === String(activeOrderId),
+    ) ?? activeDeliveries[0];
+  const activeTrackedOrder =
+    (trackedOrders ?? []).find(
+      (order) =>
+        String(order.id) === String(activeOrderId) && !order.deliveredAt,
+    ) ??
+    (trackedOrders ?? []).find(
+      (order) =>
+        order?.id != null &&
+        !order.deliveredAt &&
+        ["pending", "failed"].includes(order.assignmentStatus),
+    );
+  const pendingTrackedOrder = activeDelivery ? null : activeTrackedOrder;
+  const recentDelivered = deliverySummaries
+    .filter((entry) => entry.timing?.phase === "DELIVERED")
+    .map((entry) => ({
+      ...entry,
+      deliveredAt:
+        Number(entry.order.deliveredAt) || entry.timing.deliveredAt,
+    }))
+    .sort((left, right) => right.deliveredAt - left.deliveredAt)[0];
+  const showRecentDelivered = Boolean(
+    !activeDelivery &&
+      !pendingTrackedOrder &&
+      recentDelivered &&
+      now - recentDelivered.deliveredAt < DELIVERED_GRACE_PERIOD_MS,
+  );
   const hasCartItems = cartItemCount > 0;
   const isProfileActive = location.pathname === "/profile";
   const navLinkClass = ({ isActive }) =>
@@ -15,6 +70,26 @@ export default function Navbar({
         ? "text-primary dark:text-primary-fixed-dim border-b-2 border-primary dark:border-primary-fixed-dim pb-1 hover:text-primary dark:hover:text-primary-fixed-dim"
         : "text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim"
     }`;
+
+  useEffect(() => {
+    if (trackedDeliveries.length === 0) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(intervalId);
+  }, [trackedDeliveries.length]);
+
+  useEffect(() => {
+    deliverySummaries.forEach((entry) => {
+      if (entry.timing?.phase === "DELIVERED" && !entry.order.deliveredAt) {
+        markDeliveryDelivered(
+          entry.simulationOrder.id,
+          entry.timing.deliveredAt,
+        );
+      }
+    });
+  }, [deliverySummaries, markDeliveryDelivered]);
 
   return (
     <header className="bg-surface-container-lowest dark:bg-inverse-surface border-b border-surface-variant dark:border-outline-variant shadow-sm sticky top-0 z-50">
@@ -42,10 +117,20 @@ export default function Navbar({
           </nav>
         </div>
         <div className="flex items-center gap-4">
-          {activeOrder ? (
+          {showRecentDelivered ? (
+            <span
+              className={`${DELIVERY_BADGE_CLASS} text-on-surface-variant`}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                check_circle
+              </span>
+              Delivered
+            </span>
+          ) : activeDelivery ? (
             <Link
-              className="hidden md:flex items-center gap-2 text-primary dark:text-primary-fixed-dim bg-surface-light px-4 py-2 rounded-full font-metadata text-metadata transition-all duration-150 active:scale-95 hover:bg-surface"
-              to={`/orders/${activeOrder.id}/tracking`}
+              aria-label={`Track order ${activeDelivery.simulationOrder.id}, arriving in ${activeDelivery.timing.remainingMinutes} minutes`}
+              className={`${DELIVERY_BADGE_CLASS} text-primary transition-all duration-150 hover:bg-surface active:scale-95 dark:text-primary-fixed-dim`}
+              to={`/orders/${activeDelivery.simulationOrder.id}/tracking`}
             >
               <span
                 className="material-symbols-outlined text-[18px]"
@@ -53,11 +138,34 @@ export default function Navbar({
               >
                 pedal_bike
               </span>
-              {activeOrder.statusTitle}
+              Arriving in {activeDelivery.timing.remainingMinutes} min
+            </Link>
+          ) : pendingTrackedOrder ? (
+            <Link
+              aria-label={`Track order ${pendingTrackedOrder.id}, preparing order`}
+              className={`${DELIVERY_BADGE_CLASS} text-primary transition-all duration-150 hover:bg-surface active:scale-95 dark:text-primary-fixed-dim`}
+              to={`/orders/${pendingTrackedOrder.id}/tracking`}
+            >
+              <span
+                className="material-symbols-outlined text-[18px]"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                pedal_bike
+              </span>
+              Preparing order
             </Link>
           ) : (
-            <span className="font-metadata text-metadata text-primary dark:text-primary-fixed-dim bg-surface-light px-4 py-2 rounded-full hidden md:inline-block">
-              Guten Appetit
+            <span
+              aria-label="Delivery promise: approximately 40 minutes"
+              className={`${DELIVERY_BADGE_CLASS} text-primary dark:text-primary-fixed-dim`}
+            >
+              <span
+                className="material-symbols-outlined text-[18px]"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                pedal_bike
+              </span>
+              approx. 40 mins
             </span>
           )}
           <div className="flex gap-4">

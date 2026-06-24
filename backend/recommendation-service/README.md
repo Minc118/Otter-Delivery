@@ -24,7 +24,7 @@ Use the Supabase Session Pooler connection string instead of the direct host if 
 
 The current implementation only requires `RECOMMENDATION_DATABASE_URL` for durable PostgreSQL/Supabase persistence. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are not used by the service code.
 
-Gemini is optional and disabled by default for local development. Set `GEMINI_ENABLED=true` only when you want Gemini reranking. The service always performs deterministic scoring first, sends only the top compact candidates to Gemini, and falls back to deterministic ranking if Gemini is disabled, rate-limited, unavailable, returns invalid JSON, or recommends unknown restaurant IDs.
+Gemini is optional and disabled by default for local development. When enabled, Gemini detects and translates recommendation intent into the English labels used by the catalog, reranks compact candidates, and writes reasons in the detected request language. The service falls back to deterministic English, German, and Chinese normalization plus localized reason templates if Gemini is disabled, rate-limited, unavailable, returns invalid JSON, or recommends unknown restaurant IDs.
 
 ## Migrations
 
@@ -164,6 +164,7 @@ curl -X POST http://localhost:8004/recommendations/restaurants \
 - Database access is scoped to this service's Supabase PostgreSQL tables.
 - Restaurant and food item availability comes from `RESTAURANT_SERVICE_URL`.
 - Gemini is optional and backend-only. Missing, disabled, rate-limited, or invalid Gemini configuration falls back to deterministic scoring. Local development can run with `GEMINI_ENABLED=false`.
+- Recommendation queries are normalized into English catalog labels before scoring. The original query and detected language are retained for persistence and localized explanations.
 - Gemini receives compact reranking input only: top candidates, at most a few menu item names, scores, matched factors, and negative factors. Full database rows and backend secrets are never sent.
 - The embeddings repository is optional and unused unless `food_item_embeddings` exists and a future embedding provider is configured.
 - Order Service integration is intentionally mocked behind an `OrderClient` abstraction until Order Service is stable.
