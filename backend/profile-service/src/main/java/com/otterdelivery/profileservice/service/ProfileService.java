@@ -3,6 +3,9 @@ package com.otterdelivery.profileservice.service;
 import com.otterdelivery.profileservice.model.Profile;
 import com.otterdelivery.profileservice.repository.ProfileRepository;
 import org.springframework.stereotype.Service;
+import com.otterdelivery.profileservice.dto.OrderResponseDTO;
+import org.springframework.web.client.RestTemplate;
+import java.util.Arrays;
 
 import java.util.List;
 
@@ -43,6 +46,21 @@ public class ProfileService {
         profile.setPostalCode(newProfileData.getPostalCode());
 
         return profileRepository.save(profile);
+    }
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    public List<OrderResponseDTO> getOrdersForProfile(Long profileId) {
+        String url = "http://localhost:8002/orders/customer/" + profileId;
+
+        OrderResponseDTO[] orders =
+                restTemplate.getForObject(url, OrderResponseDTO[].class);
+
+        if (orders == null) {
+            return List.of();
+        }
+
+        return Arrays.asList(orders);
     }
 
     public void deleteProfile(Long id) {
