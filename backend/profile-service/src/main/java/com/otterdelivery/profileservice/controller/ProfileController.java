@@ -5,6 +5,7 @@ import com.otterdelivery.profileservice.service.ProfileService;
 import org.springframework.web.bind.annotation.*;
 import com.otterdelivery.profileservice.dto.OrderResponseDTO;
 import java.util.List;
+import com.otterdelivery.profileservice.dto.RecommendationDTO;
 
 @CrossOrigin(origins = "http://localhost:5173")
 @RestController
@@ -46,5 +47,15 @@ public class ProfileController {
     @GetMapping("/{id}/orders")
     public List<OrderResponseDTO> getOrdersForProfile(@PathVariable Long id) {
         return profileService.getOrdersForProfile(id);
+    }
+
+    @GetMapping("/{id}/recommendations")
+    public List<RecommendationDTO> getRecommendationsForProfile(@PathVariable Long id) {
+        return profileService.getRecommendationsForProfile(id);
+    }
+
+    @GetMapping("/login/{username}")
+    public Profile loginByUsername(@PathVariable String username) {
+        return profileService.getProfileByUsername(username);
     }
 }
