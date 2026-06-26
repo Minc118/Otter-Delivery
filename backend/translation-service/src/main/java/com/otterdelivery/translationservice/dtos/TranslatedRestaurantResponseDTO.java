@@ -24,5 +24,5 @@ public class TranslatedRestaurantResponseDTO {
     private LocalTime openingTime;
     private LocalTime closingTime;
     private AddressDTO address;
-    private List<TranslatedCategoryDTO> categories;
+    //private List<TranslatedCategoryDTO> categories;
 }
