@@ -110,14 +110,16 @@ class ScoredCandidate:
 
 
 def score_restaurants(
-    *,
-    user_id: str,
-    query: str | None,
-    preferences: dict[str, Any],
-    restaurants: list[Restaurant],
-    feedback_by_restaurant: dict[str, str] | None = None,
-    limit: int = 20,
+        *,
+        user_id: str,
+        query: str | None,
+        preferences: dict[str, Any],
+        restaurants: list[Restaurant],
+        feedback_by_restaurant: dict[str, str] | None = None,
+        history_by_restaurant: dict[str, int] | None = None,
+        limit: int = 20,
 ) -> list[ScoredCandidate]:
+    history_by_restaurant = history_by_restaurant or {}
     query_tokens = _expand_tokens(_tokens(query or ""))
     dietary = _lower_list(preferences.get("dietary") or preferences.get("dietary_preferences"))
     allergies = _lower_list(preferences.get("allergies") or preferences.get("allergens"))
@@ -192,6 +194,15 @@ def score_restaurants(
         score += feedback_score
         matched_factors.extend(feedback_match)
         negative_factors.extend(feedback_negative)
+
+        history_count = history_by_restaurant.get(restaurant.restaurant_id, 0)
+
+        if history_count > 0:
+            history_score = min(30, history_count * 15)
+            score += history_score
+            matched_factors.append("previously ordered")
+        else:
+            history_score = 0
 
         if item_scores:
             score += min(item_scores[0][0], 15)

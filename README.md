@@ -167,7 +167,10 @@ psql "$DRIVER_DATABASE_URL" -f migrations/006_enable_driver_service_rls.sql
 
 ```bash
 cd backend/driver-service
-go run ./cmd/server
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8003
 ```
 
 Default port: `8003`
@@ -236,14 +239,14 @@ Driver service check:
 
 ```bash
 cd backend/driver-service
-gofmt -w .
-go test ./...
+pytest
+python3 -m compileall app
 ```
 
 ## Current Scope
 
 - Desktop MVP only.
-- Driver Service persists driver and tracking data in Supabase PostgreSQL.
+- Driver Service uses Supabase PostgreSQL when configured and memory demo mode otherwise.
 - No real payment integration.
 - No real authentication yet.
 - Driver route estimates use a mock provider interface until Google Maps or Routes is implemented.
@@ -366,7 +369,10 @@ Driver Service：
 
 ```bash
 cd backend/driver-service
-go run ./cmd/server
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8003
 ```
 
 Recommendation Service：

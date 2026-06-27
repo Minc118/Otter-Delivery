@@ -12,6 +12,7 @@ const RECOMMENDATION_API_BASE_URL =
   import.meta.env.VITE_RECOMMENDATION_SERVICE_URL ??
   import.meta.env.VITE_RECOMMENDATION_API_URL ??
   "http://localhost:8004";
+const HOMEPAGE_RECOMMENDATION_LIMIT = 3;
 
 const SEARCH_STOP_WORDS = new Set([
   "and",
@@ -27,14 +28,14 @@ const SEARCH_STOP_WORDS = new Set([
 ]);
 
 export function getRecommendations() {
-  return recommendations;
+  return recommendations.slice(0, HOMEPAGE_RECOMMENDATION_LIMIT);
 }
 
 export function searchRecommendations(query) {
   const normalizedQuery = query.trim().toLowerCase();
 
   if (!normalizedQuery) {
-    return recommendations;
+    return getRecommendations();
   }
 
   const tokens = normalizedQuery
@@ -42,7 +43,7 @@ export function searchRecommendations(query) {
     .filter((token) => token.length > 2 && !SEARCH_STOP_WORDS.has(token));
 
   if (tokens.length === 0) {
-    return recommendations;
+    return getRecommendations();
   }
 
   return recommendations
@@ -65,7 +66,8 @@ export function searchRecommendations(query) {
     })
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)
-    .map(({ recommendation }) => recommendation);
+    .map(({ recommendation }) => recommendation)
+    .slice(0, HOMEPAGE_RECOMMENDATION_LIMIT);
 }
 
 export async function getRestaurantRecommendations(payload) {
@@ -88,16 +90,18 @@ export async function getRestaurantRecommendations(payload) {
 }
 
 export async function searchLiveRestaurantRecommendations(query) {
+  const profile = JSON.parse(localStorage.getItem("profile"));
+
   const data = await getRestaurantRecommendations({
-    userId: "frontend-demo-user",
+    userId: String(profile.id),
     query,
     preferences: {},
   });
 
   return {
-    recommendations: (data.recommendations ?? []).map((item, index) =>
-      toRecommendationCardModel(item, index),
-    ),
+    recommendations: (data.recommendations ?? [])
+      .slice(0, HOMEPAGE_RECOMMENDATION_LIMIT)
+      .map((item, index) => toRecommendationCardModel(item, index)),
     source: data.source ?? "fallback",
   };
 }
@@ -120,7 +124,7 @@ function toRecommendationCardModel(item, index) {
     },
     badge: {
       icon: "auto_awesome",
-      label: index === 0 ? "Best match" : "AI Pick",
+      label: index === 0 ? "Best Match" : "AI Recommendation",
     },
     image: {
       alt: title,
@@ -137,4 +141,35 @@ function pickRecommendationImage(seed) {
     .reduce((total, char) => (total * 31 + char.charCodeAt(0)) >>> 0, 7);
 
   return RECOMMENDATION_IMAGES[hash % RECOMMENDATION_IMAGES.length];
+}
+
+export async function getUserPreferences(userId) {
+  const response = await fetch(
+      `${RECOMMENDATION_API_BASE_URL}/preferences/${userId}`,
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return await response.json();
+}
+
+export async function updateUserPreferences(userId, preferences) {
+  const response = await fetch(
+      `${RECOMMENDATION_API_BASE_URL}/preferences/${userId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(preferences),
+      },
+  );
+
+  if (!response.ok) {
+    throw new Error("Could not update preferences");
+  }
+
+  return await response.json();
 }

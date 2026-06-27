@@ -2,28 +2,22 @@ import Card from "../ui/Card.jsx";
 
 const settingsSections = [
   {
-    key: "language",
-    icon: "language",
-    title: "Manage language",
-    description: "App language and menu translation.",
-  },
-  {
-    key: "dietary",
-    icon: "restaurant",
-    title: "Dietary preferences",
-    description: "Dietary tags and allergy warnings.",
-  },
-  {
-    key: "notifications",
-    icon: "notifications",
-    title: "Notifications",
-    description: "Order updates and AI recommendations.",
-  },
-  {
     key: "account",
     icon: "person",
-    title: "Account preferences",
-    description: "Email, password, and account actions.",
+    title: "Account",
+    description: "Manage your personal information.",
+  },
+  {
+    key: "preferences",
+    icon: "restaurant",
+    title: "Food Preferences",
+    description: "Cuisine, allergies and dietary settings.",
+  },
+  {
+    key: "orders",
+    icon: "receipt_long",
+    title: "Order History",
+    description: "View your previous orders.",
   },
 ];
 
@@ -37,9 +31,6 @@ export default function ProfileSettingsPanel({
         <h3 className="font-section-title text-section-title text-on-surface">
           Settings
         </h3>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-          Manage language, dietary, notification, and account preferences.
-        </p>
       </div>
 
       <div className="flex flex-col gap-2">

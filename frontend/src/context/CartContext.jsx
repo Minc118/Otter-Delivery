@@ -1,15 +1,61 @@
 import { createContext, useMemo, useState } from "react";
 import {
   cloneCartGroup,
-  createMockPlacedOrder,
+  getRestaurantCheckoutMeta,
+  getRestaurantPickupLocation,
+  resolveDeliveryAddressCoordinates,
+  toDriverLocation,
 } from "../services/checkoutService.js";
 import {
   getDeliveryFeeCents,
   getInitialCartGroups,
 } from "../services/cartService.js";
-import { assignDriverToOrder } from "../services/driverService.js";
+import {
+  assignDriverToOrder,
+  estimateDelivery,
+} from "../services/driverService.js";
+import { checkoutDeliveryAddress } from "../data/checkout.js";
+import { createDeliveryEtaModel } from "../services/deliveryEta.js";
 import { getCartItemCount } from "../utils/cartTotals.js";
 import { priceToCents } from "../utils/currency.js";
+
+const ORDER_SERVICE_BASE_URL =
+  import.meta.env.VITE_ORDER_SERVICE_URL ?? "http://localhost:8002";
+const DELIVERY_ADDRESS_STORAGE_KEY = "otter-delivery-address";
+const LAST_ORDER_STORAGE_KEY = "otter-last-placed-order";
+const TRACKED_ORDERS_STORAGE_KEY = "otter-tracked-orders-v1";
+const ACTIVE_ORDER_ID_STORAGE_KEY = "otter-active-order-id";
+
+function readStoredValue(key, fallback) {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function storeValue(key, value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function readInitialTrackedOrders() {
+  const storedOrders = readStoredValue(TRACKED_ORDERS_STORAGE_KEY, null);
+  if (storedOrders && typeof storedOrders === "object") {
+    return storedOrders;
+  }
+
+  const legacyOrder = readStoredValue(LAST_ORDER_STORAGE_KEY, null);
+  return legacyOrder?.id ? { [String(legacyOrder.id)]: legacyOrder } : {};
+}
 
 export const CartContext = createContext(null);
 export function CartProvider({ children }) {
@@ -20,12 +66,31 @@ export function CartProvider({ children }) {
   const [checkoutDraft, setCheckoutDraft] = useState(
     cloneCartGroup(initialCartGroups[0]),
   );
-  const [lastPlacedOrder, setLastPlacedOrder] = useState(null);
+  const [deliveryAddress, setDeliveryAddress] = useState(() =>
+    readStoredValue(DELIVERY_ADDRESS_STORAGE_KEY, checkoutDeliveryAddress),
+  );
+  const [trackedOrdersById, setTrackedOrdersById] = useState(() =>
+    readInitialTrackedOrders(),
+  );
+  const [activeOrderId, setActiveOrderId] = useState(() =>
+    readStoredValue(ACTIVE_ORDER_ID_STORAGE_KEY, null),
+  );
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(
     initialCartGroups[0]?.restaurantId ?? null,
   );
 
   const itemCount = useMemo(() => getCartItemCount(cartGroups), [cartGroups]);
+  const trackedOrders = useMemo(
+    () =>
+      Object.values(trackedOrdersById).sort(
+        (left, right) =>
+          Number(right.trackingStartedAt ?? right.createdAt ?? 0) -
+          Number(left.trackingStartedAt ?? left.createdAt ?? 0),
+      ),
+    [trackedOrdersById],
+  );
+  const lastPlacedOrder =
+    trackedOrdersById[String(activeOrderId)] ?? trackedOrders[0] ?? null;
   const selectedGroup = useMemo(
     () =>
       cartGroups.find((group) => group.restaurantId === selectedRestaurantId) ??
@@ -43,6 +108,59 @@ export function CartProvider({ children }) {
     setCheckoutDraft(draft);
 
     return draft;
+  }
+
+  function updateDeliveryAddress(nextAddress) {
+    const normalizedAddress = resolveDeliveryAddressCoordinates(
+      nextAddress,
+      deliveryAddress,
+    );
+    setDeliveryAddress(normalizedAddress);
+    storeValue(DELIVERY_ADDRESS_STORAGE_KEY, normalizedAddress);
+  }
+
+  function rememberPlacedOrder(order) {
+    const orderId = String(order.id);
+    setTrackedOrdersById((currentOrders) => {
+      const nextOrders = { ...currentOrders, [orderId]: order };
+      storeValue(TRACKED_ORDERS_STORAGE_KEY, nextOrders);
+      return nextOrders;
+    });
+    setActiveOrderId(orderId);
+    storeValue(ACTIVE_ORDER_ID_STORAGE_KEY, orderId);
+    storeValue(LAST_ORDER_STORAGE_KEY, order);
+  }
+
+  function markDeliveryDelivered(orderId, deliveredAt) {
+    const normalizedId = String(orderId);
+    setTrackedOrdersById((currentOrders) => {
+      const currentOrder = currentOrders[normalizedId];
+      if (!currentOrder || currentOrder.deliveredAt) {
+        return currentOrders;
+      }
+
+      const deliveredOrder = { ...currentOrder, deliveredAt };
+      const nextOrders = {
+        ...currentOrders,
+        [normalizedId]: deliveredOrder,
+      };
+      storeValue(TRACKED_ORDERS_STORAGE_KEY, nextOrders);
+      if (String(activeOrderId) === normalizedId) {
+        storeValue(LAST_ORDER_STORAGE_KEY, deliveredOrder);
+      }
+      return nextOrders;
+    });
+  }
+
+  function selectTrackedOrder(orderId) {
+    const normalizedId = String(orderId);
+    if (!trackedOrdersById[normalizedId]) {
+      return;
+    }
+
+    setActiveOrderId(normalizedId);
+    storeValue(ACTIVE_ORDER_ID_STORAGE_KEY, normalizedId);
+    storeValue(LAST_ORDER_STORAGE_KEY, trackedOrdersById[normalizedId]);
   }
 
   function removeEmptyGroups(groups) {
@@ -219,13 +337,15 @@ export function CartProvider({ children }) {
       return null;
     }
 
-    const response = await fetch("http://localhost:8002/orders", {
+    const profile = JSON.parse(localStorage.getItem("profile"));
+
+    const response = await fetch(`${ORDER_SERVICE_BASE_URL}/orders`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        customerId: 1,
+        customerId: profile.id,
         restaurantId: group.restaurantId,
         items: group.items.map((item) => ({
           menuItemId: item.id,
@@ -239,41 +359,76 @@ export function CartProvider({ children }) {
     }
 
     const backendOrder = await response.json();
+    const restaurantMeta = getRestaurantCheckoutMeta(
+      group.restaurantId,
+      group.restaurantMeta,
+    );
+    const pickupLocation = getRestaurantPickupLocation(group);
 
+    const orderId = String(backendOrder.id);
     const placedOrder = {
-      id: backendOrder.id,
+      id: orderId,
+      createdAt: Date.now(),
       displayId: `ORDER-${backendOrder.id}`,
       restaurantId: group.restaurantId,
       restaurantName: group.restaurantName,
+      restaurantImage: restaurantMeta.image,
       items: group.items,
       paymentMethod,
+      deliveryAddress: { ...deliveryAddress },
+      pickupLocation,
+      deliveryFeeCents,
       totalCents: Math.round(backendOrder.totalPrice * 100),
       estimatedDeliveryTime: "approx. 40 min",
+      assignmentStatus: "pending",
     };
 
-    setLastPlacedOrder(placedOrder);
+    rememberPlacedOrder(placedOrder);
     setCheckoutDraft(null);
     removeRestaurant(group.restaurantId);
 
     try {
       const assignment = await assignDriverToOrder(placedOrder.id);
-      const assignedOrder = {
+      let assignedOrder = {
         ...placedOrder,
         assignedDriver: assignment.driver,
         assignment: assignment.assignment,
         assignmentStatus: "assigned",
+        trackingStartedAt: Date.now(),
       };
 
-      setLastPlacedOrder(assignedOrder);
+      rememberPlacedOrder(assignedOrder);
+
+      try {
+        const routeEstimate = await estimateDelivery({
+          orderId: placedOrder.id,
+          pickupLocation,
+          customerLocation: toDriverLocation(deliveryAddress),
+        });
+        const deliveryEta = createDeliveryEtaModel(
+          routeEstimate.estimate?.durationSeconds ??
+            routeEstimate.durationSeconds,
+        );
+        assignedOrder = {
+          ...assignedOrder,
+          deliveryEta,
+          routeEstimate,
+          estimatedDeliveryTime: `approx. ${deliveryEta.totalEtaMinutes} min`,
+        };
+        rememberPlacedOrder(assignedOrder);
+      } catch {
+        console.warn("Route estimate unavailable; using the demo tracking route.");
+      }
+
       return assignedOrder;
-    } catch (error) {
+    } catch {
       const unassignedOrder = {
         ...placedOrder,
-        assignmentError: error.message,
         assignmentStatus: "failed",
       };
 
-      setLastPlacedOrder(unassignedOrder);
+      console.warn("Driver assignment unavailable; the order remains placed.");
+      rememberPlacedOrder(unassignedOrder);
       return unassignedOrder;
     }
   }
@@ -285,10 +440,13 @@ export function CartProvider({ children }) {
       cartGroups,
       checkoutDraft,
       decrementItem,
+      deliveryAddress,
       deliveryFeeCents,
       incrementItem,
       itemCount,
       lastPlacedOrder,
+      activeOrderId,
+      markDeliveryDelivered,
       placeCheckoutOrder,
       removeItem,
       removeRestaurant,
@@ -296,16 +454,22 @@ export function CartProvider({ children }) {
       selectedGroup,
       selectedRestaurantId: selectedGroup?.restaurantId ?? null,
       selectRestaurant,
+      selectTrackedOrder,
+      trackedOrders,
       updateItemQuantity,
+      updateDeliveryAddress,
       cartWarning,
       setCartWarning,
     }),
     [
       cartGroups,
       checkoutDraft,
+      deliveryAddress,
       itemCount,
       lastPlacedOrder,
+      activeOrderId,
       selectedGroup,
+      trackedOrders,
       cartWarning,
     ],
   );

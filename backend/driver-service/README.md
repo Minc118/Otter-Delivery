@@ -1,147 +1,79 @@
 # driver-service
 
-Go REST service for driver availability, driver positions, delivery assignment, route estimation, and order tracking.
+FastAPI service for driver availability, positions, delivery assignment, route
+estimation, and order tracking. The service keeps the original Driver Service
+HTTP contract and port (`8003`).
 
-The frontend must call this REST API only. It must not connect to Supabase PostgreSQL directly.
+## Repository modes
 
-## Configuration
+- `memory`: selected when neither `DRIVER_DATABASE_URL` nor `DATABASE_URL` is
+  configured. Five demo drivers are created at startup.
+- `postgres`: selected when `DRIVER_DATABASE_URL` is configured. `DATABASE_URL`
+  is supported only as a fallback.
 
-Create a `.env` file in the repository root or in `backend/driver-service`:
+The health response reports only the selected mode; it never returns connection
+details or credentials.
 
-```bash
-DRIVER_DATABASE_URL=postgresql://postgres:<password>@db.rotymfjrtkncxixmiqdr.supabase.co:5432/postgres?sslmode=require
-GOOGLE_MAPS_API_KEY=
-GOOGLE_ROUTES_API_KEY=
-PORT=8003
-ETA_MINUTES=40
-```
-
-`DRIVER_DATABASE_URL` is the preferred Driver Service database variable. `DATABASE_URL` is still supported as a fallback for deployment platforms that expose a generic database URL. The Google key variables are read by configuration now, but the real Google Maps or Routes provider is not implemented yet.
-
-If your network cannot reach Supabase's direct database host over IPv6, use the Supabase Session Pooler URI instead and still store it in `DRIVER_DATABASE_URL`.
-
-## Run Migrations
-
-Preferred Supabase CLI workflow from the repository root:
+## Local development
 
 ```bash
-supabase db push --db-url "$DRIVER_DATABASE_URL"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pytest
+uvicorn app.main:app --host 0.0.0.0 --port 8003
 ```
 
-This applies the migration files in `supabase/migrations`.
+Without database configuration, these commands run entirely in demo mode.
 
-Alternative direct SQL workflow from `backend/driver-service`:
-
-```bash
-psql "$DRIVER_DATABASE_URL" -f migrations/001_create_drivers.sql
-psql "$DRIVER_DATABASE_URL" -f migrations/002_create_delivery_assignments.sql
-psql "$DRIVER_DATABASE_URL" -f migrations/003_create_tracking_events.sql
-psql "$DRIVER_DATABASE_URL" -f migrations/004_create_route_estimates.sql
-psql "$DRIVER_DATABASE_URL" -f migrations/005_seed_driver_demo_data.sql
-psql "$DRIVER_DATABASE_URL" -f migrations/006_enable_driver_service_rls.sql
-```
-
-You can also paste the files into the Supabase SQL editor in the same order.
-
-The seed migration creates five demo drivers:
-
-```sql
-drv_demo_alex
-drv_demo_sam
-drv_demo_mina
-drv_demo_noah
-drv_demo_lina
-```
-
-They are used by `POST /drivers/assign` when the frontend places an order.
-
-RLS is enabled on Driver Service tables without anon/auth policies. This keeps Supabase client access blocked; the frontend should use the Driver Service REST API only.
-
-## Start
-
-```bash
-go run ./cmd/server
-```
-
-Default URL: `http://localhost:8003`
-
-With Docker Compose from the repository root:
-
-```bash
-docker compose up --build driver-service
-```
-
-## Endpoints
+## API
 
 - `GET /health`
 - `GET /drivers/available`
 - `GET /drivers/{driverId}`
+- `GET /drivers/{driverId}/location`
 - `PATCH /drivers/{driverId}/position`
 - `POST /drivers/assign`
 - `POST /drivers/estimate`
 - `GET /orders/{orderId}/tracking`
 
-## Examples
+Requests and responses use camelCase JSON for frontend compatibility. Errors use
+the following shape:
 
-```bash
-curl http://localhost:8003/drivers/available
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable message."
+  }
+}
 ```
 
-```bash
-curl http://localhost:8003/drivers/<driver-id>
-```
+Assignment is idempotent by `orderId`. Repeating a successful assignment returns
+the existing assignment and driver without creating another tracking event.
+
+Route estimation uses Google Routes when `GOOGLE_ROUTES_API_KEY` is configured.
+Only distance, duration, and encoded route geometry are requested. If the key is
+missing or the provider request fails, the service returns a deterministic mock
+route instead. The API key is never included in responses or logs.
+
+## Database migrations
+
+The existing migrations in `migrations/` are retained unchanged. They create the
+driver, assignment, tracking event, and route estimate tables, seed demo drivers,
+and enable RLS. The backend connects directly to PostgreSQL and the frontend uses
+only this service's REST API.
+
+Apply migrations through the repository's established Supabase migration
+workflow. Do not apply both the service-local migration set and the equivalent
+root `supabase/migrations` set to a fresh database without first checking the
+migration history.
+
+## Docker
 
 ```bash
-curl -X PATCH http://localhost:8003/drivers/<driver-id>/position \
-  -H "Content-Type: application/json" \
-  -d '{
-    "location": {
-      "lat": 52.5211,
-      "lng": 13.4072
-    }
-  }'
+docker compose build driver-service
+docker compose up driver-service
 ```
 
-```bash
-curl -X POST http://localhost:8003/drivers/assign \
-  -H "Content-Type: application/json" \
-  -d '{
-    "orderId": "order_123",
-    "driverId": "<driver-id>"
-  }'
-```
-
-Omit `driverId` to assign the oldest available driver automatically:
-
-```bash
-curl -X POST http://localhost:8003/drivers/assign \
-  -H "Content-Type: application/json" \
-  -d '{"orderId": "order_124"}'
-```
-
-```bash
-curl -X POST http://localhost:8003/drivers/estimate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "orderId": "order_125",
-    "restaurantId": "rest_001",
-    "pickupLocation": {
-      "lat": 52.5200,
-      "lng": 13.4050
-    },
-    "customerLocation": {
-      "lat": 52.5163,
-      "lng": 13.3777
-    }
-  }'
-```
-
-```bash
-curl http://localhost:8003/orders/order_123/tracking
-```
-
-## Provider Boundaries
-
-Route estimates are stored in PostgreSQL, but the estimate is currently produced by `MockRouteEstimator`. A real Google Maps or Google Routes implementation can be added behind the same service interface later without changing the HTTP API.
-
-Order assignment is already live for the demo flow: after the frontend places an order, it calls `POST /drivers/assign` with the new `orderId`. The Driver Service assigns the oldest available demo driver, marks that driver as `ON_DELIVERY`, creates a delivery assignment, and writes a tracking event.
+The Compose service starts in memory mode when no database URL is supplied.

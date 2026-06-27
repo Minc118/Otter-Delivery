@@ -1,19 +1,17 @@
-FROM golang:1.22-alpine AS builder
+FROM python:3.12-slim
 
 WORKDIR /app
-COPY go.mod go.sum* ./
-COPY cmd ./cmd
-COPY internal ./internal
 
-RUN go build -o /driver-service ./cmd/server
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-FROM alpine:3.20
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-WORKDIR /app
-COPY --from=builder /driver-service /app/driver-service
+COPY app ./app
 
 EXPOSE 8003
 ENV PORT=8003
 ENV ETA_MINUTES=40
 
-CMD ["/app/driver-service"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8003}"]

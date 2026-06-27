@@ -16,7 +16,6 @@ import RankingPage from "./routes/RankingPage.jsx";
 import RestaurantDetailPage from "./routes/RestaurantDetailPage.jsx";
 import RestaurantDiscoveryPage from "./routes/RestaurantDiscoveryPage.jsx";
 import SavedRestaurantsPage from "./routes/SavedRestaurantsPage.jsx";
-import { getActiveOrder } from "./services/orderService.js";
 
 export default function App() {
   return (
@@ -29,18 +28,24 @@ export default function App() {
 function AppLayout() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const location = useLocation();
-  const { itemCount } = useCart();
-  const activeOrder = getActiveOrder();
+  const {
+    activeOrderId,
+    itemCount,
+    markDeliveryDelivered,
+    trackedOrders,
+  } = useCart();
   const isTransactionalRoute = location.pathname === "/login";
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-container-lowest text-on-surface font-body-md">
       {isTransactionalRoute ? null : (
         <Navbar
-          activeOrder={activeOrder}
           cartItemCount={itemCount}
           isCartOpen={isCartOpen}
+          activeOrderId={activeOrderId}
+          markDeliveryDelivered={markDeliveryDelivered}
           onCartClick={() => setIsCartOpen(true)}
+          trackedOrders={trackedOrders}
         />
       )}
       <main className="flex-grow">
