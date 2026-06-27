@@ -1,28 +1,29 @@
 import { useState } from "react";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import { updateProfile } from "../../services/profileService.js";
+import {
+    getUserPreferences,
+    updateUserPreferences,
+} from "../../services/recommendationService.js";
+import { useNavigate } from "react-router-dom";
 
 const sectionCopy = {
-  language: {
-    icon: "language",
-    title: "Manage language",
-    description: "Set your app language and menu translation behavior.",
-  },
-  dietary: {
-    icon: "restaurant",
-    title: "Dietary preferences",
-    description: "Help Otter highlight dishes that match your needs.",
-  },
-  notifications: {
-    icon: "notifications",
-    title: "Notifications",
-    description: "Choose which updates Otter can send you.",
-  },
-  account: {
-    icon: "person",
-    title: "Account preferences",
-    description: "Manage sign-in details and account actions.",
-  },
+    account: {
+        icon: "person",
+        title: "Account preferences",
+        description: "Manage your personal information.",
+    },
+    preferences: {
+        icon: "restaurant",
+        title: "Food Preferences",
+        description: "Save your favorite cuisines and dietary needs.",
+    },
+    orders: {
+        icon: "receipt_long",
+        title: "Order History",
+        description: "View your previous orders.",
+    },
 };
 
 export default function ProfileSettingsDetails({
@@ -75,12 +76,9 @@ export default function ProfileSettingsDetails({
         />
       ) : null}
 
-      {activeSection === "dietary" ? (
-        <DietarySettings
-          dietary={dietary}
-          onToggleDietary={toggleDietary}
-        />
-      ) : null}
+        {activeSection === "preferences" ? (
+            <FoodPreferencesSettings user={user} />
+        ) : null}
 
       {activeSection === "notifications" ? (
         <NotificationSettings
@@ -89,8 +87,9 @@ export default function ProfileSettingsDetails({
         />
       ) : null}
 
-      {activeSection === "account" ? <AccountSettings user={user} /> : null}
-    </Card>
+        {activeSection === "account" ? (
+            <AccountSettings user={user} />
+        ) : null}    </Card>
   );
 }
 
@@ -263,35 +262,301 @@ function NotificationSettings({ notifications, onNotificationsChange }) {
 }
 
 function AccountSettings({ user }) {
-  return (
-    <div className="flex flex-col gap-stack-md">
-      <AccountRow
-        action="Edit"
-        label="Email Address"
-        value={user.email}
-      />
-      <div className="h-px bg-surface" />
-      <AccountRow
-        action="Update"
-        label="Password"
-        value="••••••••••••"
-      />
-      <div className="mt-2 pt-4 border-t border-surface flex justify-between items-center gap-4">
-        <Button
-          className="border-error text-error hover:bg-error-container"
-          variant="secondary"
+    const navigate = useNavigate();
+
+    function handleLogout() {
+        localStorage.removeItem("profile");
+        localStorage.removeItem("cart");
+        localStorage.removeItem("activeOrder");
+
+        navigate("/login", { replace: true });
+    }
+    const [formData, setFormData] = useState({
+        username: user.username ?? "",
+        firstName: user.firstName ?? "",
+        lastName: user.lastName ?? "",
+        email: user.email ?? "",
+        phoneNumber: user.phoneNumber ?? "",
+        street: user.street ?? "",
+        city: user.city ?? "",
+        postalCode: user.postalCode ?? "",
+    });
+
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState("");
+
+    function handleChange(event) {
+        const { name, value } = event.target;
+
+        setFormData((current) => ({
+            ...current,
+            [name]: value,
+        }));
+    }
+
+    async function handleSubmit(event) {
+        event.preventDefault();
+        setSaving(true);
+        setMessage("");
+
+        try {
+            const updatedProfile = await updateProfile(user.id, {
+                ...user,
+                ...formData,
+            });
+
+            localStorage.setItem("profile", JSON.stringify(updatedProfile));
+            setMessage("Profile updated successfully.");
+        } catch (error) {
+            console.error(error);
+            setMessage("Could not update profile.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-stack-md"
         >
-          Sign Out
-        </Button>
-        <button
-          className="text-on-surface-variant font-metadata text-metadata hover:underline"
-          type="button"
-        >
-          Delete Account
-        </button>
-      </div>
-    </div>
-  );
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <AccountInput
+                    label="Username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                />
+
+                <AccountInput
+                    label="Email Address"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                />
+
+                <AccountInput
+                    label="First Name"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                />
+
+                <AccountInput
+                    label="Last Name"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                />
+
+                <AccountInput
+                    label="Phone Number"
+                    name="phoneNumber"
+                    value={formData.phoneNumber}
+                    onChange={handleChange}
+                />
+
+                <AccountInput
+                    label="Street"
+                    name="street"
+                    value={formData.street}
+                    onChange={handleChange}
+                />
+
+                <AccountInput
+                    label="City"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                />
+
+                <AccountInput
+                    label="Postal Code"
+                    name="postalCode"
+                    value={formData.postalCode}
+                    onChange={handleChange}
+                />
+            </div>
+
+            <div className="mt-2 pt-4 border-t border-surface flex justify-between items-center gap-4">
+
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleLogout}
+                >
+                    Log out
+                </Button>
+
+                <p
+                    className={`font-metadata text-metadata ${
+                        message.includes("successfully")
+                            ? "text-green-600"
+                            : "text-error"
+                    }`}
+                >
+                    {message}
+                </p>
+
+                <Button type="submit" disabled={saving}>
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+
+            </div>
+        </form>
+    );
+}
+
+function FoodPreferencesSettings({ user }) {
+    const cuisineOptions = ["Italian", "Korean", "Japanese", "Mexican", "Indian", "Turkish"];
+    const dietaryOptions = ["Vegetarian", "Vegan", "Halal", "Gluten-free", "Healthy", "Spicy"];
+
+    const [favoriteCuisines, setFavoriteCuisines] = useState([]);
+    const [dietaryPreferences, setDietaryPreferences] = useState([]);
+    const [allergens, setAllergens] = useState("");
+    const [dislikedIngredients, setDislikedIngredients] = useState("");
+    const [maxPrice, setMaxPrice] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState("");
+
+    function toggleValue(value, setter) {
+        setter((current) =>
+            current.includes(value)
+                ? current.filter((item) => item !== value)
+                : [...current, value],
+        );
+    }
+
+    async function handleSave() {
+        setSaving(true);
+        setMessage("");
+
+        try {
+            await updateUserPreferences(String(user.id), {
+                language: "en",
+                cuisinePreferences: favoriteCuisines.map((item) => item.toLowerCase()),
+                dietaryPreferences: dietaryPreferences.map((item) => item.toLowerCase()),
+                allergens: allergens
+                    .split(",")
+                    .map((item) => item.trim().toLowerCase())
+                    .filter(Boolean),
+                dislikedIngredients: dislikedIngredients
+                    .split(",")
+                    .map((item) => item.trim().toLowerCase())
+                    .filter(Boolean),
+                maxPrice: maxPrice ? Number(maxPrice) : null,
+                metadata: {},
+            });
+
+            setMessage("Preferences saved successfully.");
+        } catch (error) {
+            console.error(error);
+            setMessage("Could not save preferences.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="flex flex-col gap-stack-md">
+            <PreferenceGroup
+                title="Favorite cuisines"
+                description="Choose cuisines you usually enjoy."
+                options={cuisineOptions}
+                selected={favoriteCuisines}
+                onToggle={(value) => toggleValue(value, setFavoriteCuisines)}
+            />
+
+            <PreferenceGroup
+                title="Dietary preferences"
+                description="These preferences can influence your restaurant recommendations."
+                options={dietaryOptions}
+                selected={dietaryPreferences}
+                onToggle={(value) => toggleValue(value, setDietaryPreferences)}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <AccountInput
+                    label="Allergies"
+                    name="allergens"
+                    value={allergens}
+                    onChange={(event) => setAllergens(event.target.value)}
+                />
+
+                <AccountInput
+                    label="Disliked ingredients"
+                    name="dislikedIngredients"
+                    value={dislikedIngredients}
+                    onChange={(event) => setDislikedIngredients(event.target.value)}
+                />
+
+                <AccountInput
+                    label="Maximum price"
+                    name="maxPrice"
+                    type="number"
+                    value={maxPrice}
+                    onChange={(event) => setMaxPrice(event.target.value)}
+                />
+            </div>
+
+            <div className="mt-2 pt-4 border-t border-surface flex justify-between items-center gap-4">
+                <p
+                    className={`font-metadata text-metadata ${
+                        message.includes("successfully")
+                            ? "text-green-600"
+                            : "text-error"
+                    }`}
+                >
+                    {message}
+                </p>
+
+                <Button type="button" disabled={saving} onClick={handleSave}>
+                    {saving ? "Saving..." : "Save Preferences"}
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function PreferenceGroup({ title, description, options, selected, onToggle }) {
+    return (
+        <div>
+            <h3 className="font-card-title text-card-title text-on-surface">
+                {title}
+            </h3>
+
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1 mb-3">
+                {description}
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+                {options.map((option) => {
+                    const active = selected.includes(option);
+
+                    return (
+                        <button
+                            key={option}
+                            type="button"
+                            onClick={() => onToggle(option)}
+                            className={
+                                active
+                                    ? "px-4 py-2 rounded-full border border-primary-container bg-primary-container text-white font-button text-button inline-flex items-center gap-2"
+                                    : "px-4 py-2 rounded-full border border-primary-container bg-surface-container-lowest text-primary-container font-button text-button hover:bg-surface-container-low transition-colors"
+                            }
+                        >
+                            {active ? (
+                                <span className="material-symbols-outlined text-[18px]">
+                  check
+                </span>
+                            ) : null}
+                            {option}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
 }
 
 function ToggleRow({ checked, description, label, onChange }) {
@@ -338,4 +603,22 @@ function AccountRow({ action, label, value }) {
       </button>
     </div>
   );
+}
+
+function AccountInput({ label, name, value, onChange, type = "text" }) {
+    return (
+        <label className="block">
+      <span className="block font-metadata text-metadata text-on-surface-variant uppercase tracking-wider mb-2">
+        {label}
+      </span>
+
+            <input
+                type={type}
+                name={name}
+                value={value}
+                onChange={onChange}
+                className="w-full rounded-lg border border-surface bg-surface-container-low px-4 py-3 font-body-md text-body-md text-on-surface outline-none transition focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
+            />
+        </label>
+    );
 }

@@ -90,8 +90,10 @@ export async function getRestaurantRecommendations(payload) {
 }
 
 export async function searchLiveRestaurantRecommendations(query) {
+  const profile = JSON.parse(localStorage.getItem("profile"));
+
   const data = await getRestaurantRecommendations({
-    userId: "frontend-demo-user",
+    userId: String(profile.id),
     query,
     preferences: {},
   });
@@ -139,4 +141,35 @@ function pickRecommendationImage(seed) {
     .reduce((total, char) => (total * 31 + char.charCodeAt(0)) >>> 0, 7);
 
   return RECOMMENDATION_IMAGES[hash % RECOMMENDATION_IMAGES.length];
+}
+
+export async function getUserPreferences(userId) {
+  const response = await fetch(
+      `${RECOMMENDATION_API_BASE_URL}/preferences/${userId}`,
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return await response.json();
+}
+
+export async function updateUserPreferences(userId, preferences) {
+  const response = await fetch(
+      `${RECOMMENDATION_API_BASE_URL}/preferences/${userId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(preferences),
+      },
+  );
+
+  if (!response.ok) {
+    throw new Error("Could not update preferences");
+  }
+
+  return await response.json();
 }

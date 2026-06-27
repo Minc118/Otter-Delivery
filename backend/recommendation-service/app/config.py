@@ -36,6 +36,12 @@ class Settings(BaseSettings):
         default="http://restaurant-service:8001",
         alias="RESTAURANT_SERVICE_URL",
     )
+
+    order_service_url: str = Field(
+        default="http://order-service:8002",
+        alias="ORDER_SERVICE_URL",
+    )
+
     llm_api_key: str | None = Field(default=None, alias="LLM_API_KEY")
     embedding_api_key: str | None = Field(default=None, alias="EMBEDDING_API_KEY")
     gemini_enabled: bool = Field(default=False, alias="GEMINI_ENABLED")

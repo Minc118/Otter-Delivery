@@ -39,7 +39,7 @@ from app.services.multilingual import (
     localize_candidate_reasons,
     normalize_recommendation_input,
 )
-from app.services.order_client import MockOrderClient, OrderClient
+from app.services.order_client import HttpOrderClient, OrderClient
 from app.services.restaurant_client import HttpRestaurantCatalogClient, RestaurantCatalogClient
 from app.services.scoring import ScoredCandidate, score_restaurants
 
@@ -59,7 +59,8 @@ class RecommendationService:
         self.llm_provider = llm_provider or MockLLMRecommendationProvider()
         self.gemini_language_normalizer = GeminiLanguageNormalizer(settings)
         self.gemini_reranker = GeminiReranker(settings)
-        self.order_client = order_client or MockOrderClient()
+        self.order_client = order_client or HttpOrderClient(settings)
+
 
     def get_preference(self, user_id: str) -> UserPreference | None:
         if self.db is None:
@@ -155,16 +156,20 @@ class RecommendationService:
         stored_preferences = self._stored_preferences(payload.user_id)
         request_preferences = payload.preferences.model_dump(mode="json")
         effective_preferences = _merge_preferences(stored_preferences, request_preferences)
+
         normalized = self._normalize_input(
             query=payload.query,
             preferences=effective_preferences,
             language_hint=str(stored_preferences.get("language") or "") or None,
         )
-        _ = self.order_client.get_order_history(payload.user_id)
+
+        order_history = self.order_client.get_order_history(payload.user_id)
+        history_by_restaurant = _history_by_restaurant(order_history)
 
         restaurants = self.restaurant_client.fetch_catalog()
         catalog_fallback = bool(getattr(self.restaurant_client, "used_fallback", False))
         candidates = score_restaurants(
+            history_by_restaurant=history_by_restaurant,
             user_id=payload.user_id,
             query=normalized.canonical_query,
             preferences=normalized.canonical_preferences,
@@ -533,3 +538,19 @@ def _number(value):
     if isinstance(value, Decimal):
         return float(value)
     return value
+
+def _history_by_restaurant(
+        orders: list[dict[str, Any]],
+) -> dict[str, int]:
+    history: dict[str, int] = {}
+
+    for order in orders:
+        restaurant_id = order.get("restaurantId")
+
+        if restaurant_id is None:
+            continue
+
+        key = str(restaurant_id)
+        history[key] = history.get(key, 0) + 1
+
+    return history

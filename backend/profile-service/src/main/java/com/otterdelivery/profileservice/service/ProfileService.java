@@ -7,10 +7,6 @@ import org.springframework.stereotype.Service;
 import com.otterdelivery.profileservice.dto.OrderResponseDTO;
 import org.springframework.web.client.RestTemplate;
 import java.util.Arrays;
-import com.otterdelivery.profileservice.dto.RecommendationDTO;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 import java.util.List;
 
@@ -81,40 +77,6 @@ public class ProfileService {
 
     public void deleteProfile(Long id) {
         profileRepository.deleteById(id);
-    }
-
-    public List<RecommendationDTO> getRecommendationsForProfile(Long profileId) {
-        List<OrderResponseDTO> orders = getOrdersForProfile(profileId);
-
-        Map<Long, Integer> restaurantCounter = new HashMap<>();
-
-        for (OrderResponseDTO order : orders) {
-            Long restaurantId = order.getRestaurantId();
-
-            if (restaurantId != null) {
-                restaurantCounter.put(
-                        restaurantId,
-                        restaurantCounter.getOrDefault(restaurantId, 0) + 1
-                );
-            }
-        }
-
-        List<RecommendationDTO> recommendations = new ArrayList<>();
-
-        restaurantCounter.entrySet()
-                .stream()
-                .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
-                .limit(3)
-                .forEach(entry -> {
-                    recommendations.add(
-                            new RecommendationDTO(
-                                    entry.getKey(),
-                                    "Because this is one of your most ordered restaurants"
-                            )
-                    );
-                });
-
-        return recommendations;
     }
 
     public Profile getProfileByUsername(String username) {

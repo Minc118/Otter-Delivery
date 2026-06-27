@@ -1,6 +1,7 @@
 package com.otterdelivery.profileservice.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class OrderResponseDTO {
 
@@ -10,6 +11,7 @@ public class OrderResponseDTO {
     private String status;
     private double totalPrice;
     private LocalDateTime createdAt;
+    private List<OrderItemDTO> items;
 
     public OrderResponseDTO() {
     }
@@ -52,5 +54,13 @@ public class OrderResponseDTO {
 
     public void setTotalPrice(double totalPrice) {
         this.totalPrice = totalPrice;
+    }
+
+    public List<OrderItemDTO> getItems() {
+        return items;
+    }
+
+    public void setItems(List<OrderItemDTO> items) {
+        this.items = items;
     }
 }

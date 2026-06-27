@@ -337,13 +337,15 @@ export function CartProvider({ children }) {
       return null;
     }
 
+    const profile = JSON.parse(localStorage.getItem("profile"));
+
     const response = await fetch(`${ORDER_SERVICE_BASE_URL}/orders`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        customerId: 1,
+        customerId: profile.id,
         restaurantId: group.restaurantId,
         items: group.items.map((item) => ({
           menuItemId: item.id,

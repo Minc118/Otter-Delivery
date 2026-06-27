@@ -64,6 +64,7 @@ export default function Navbar({
   );
   const hasCartItems = cartItemCount > 0;
   const isProfileActive = location.pathname === "/profile";
+  const profile = JSON.parse(localStorage.getItem("profile"));
   const navLinkClass = ({ isActive }) =>
     `font-body-md text-body-md transition-all duration-150 active:scale-95 ${
       isActive
@@ -203,13 +204,13 @@ export default function Navbar({
               ) : null}
             </button>
             <Link
-              aria-label="Open account"
-              className={`transition-all duration-150 active:scale-95 p-2 ${
-                isProfileActive
-                  ? "text-primary border-b-2 border-primary pb-1"
-                  : "text-on-surface-variant dark:text-surface-variant hover:text-primary"
-              }`}
-              to="/profile"
+                aria-label="Open account"
+                className={`transition-all duration-150 active:scale-95 p-2 ${
+                    isProfileActive
+                        ? "text-primary border-b-2 border-primary pb-1"
+                        : "text-on-surface-variant dark:text-surface-variant hover:text-primary"
+                }`}
+                to={profile ? "/profile" : "/login"}
             >
               <span
                 className="material-symbols-outlined"
