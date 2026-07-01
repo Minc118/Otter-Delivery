@@ -57,6 +57,8 @@ def create_app(
 
 
 def _build_repository(settings: Settings) -> DriverRepository:
+    if settings.normalized_repository_mode == "memory":
+        return MemoryDriverRepository()
     if settings.effective_database_url:
         return PostgresDriverRepository(settings.effective_database_url)
     return MemoryDriverRepository()

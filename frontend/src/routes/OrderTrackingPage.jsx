@@ -7,14 +7,19 @@ import SupportCard from "../components/order/SupportCard.jsx";
 import TrackingStatusHeader from "../components/order/TrackingStatusHeader.jsx";
 import useCart from "../hooks/useCart.js";
 import useDeliverySimulation from "../hooks/useDeliverySimulation.js";
-import { getOrderTracking } from "../services/driverService.js";
+import {
+  getOrderTracking,
+  isTrackingNotFoundError,
+} from "../services/driverService.js";
 import { getOrderById } from "../services/orderService.js";
 import { normalizeRouteEstimate } from "../services/trackingState.js";
+import { getRoutePoints, normalizeRoutePoint } from "../services/routeGeometry.js";
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
   const {
     markDeliveryDelivered,
+    markTrackingUnavailable,
     selectTrackedOrder,
     trackedOrders,
   } = useCart();
@@ -29,7 +34,12 @@ export default function OrderTrackingPage() {
     tracking,
   });
   const simulation = useDeliverySimulation(baseOrder);
-  const order = { ...baseOrder, ...simulation };
+  const order = {
+    ...baseOrder,
+    ...simulation,
+    routeProgress: simulation?.routeProgress ?? baseOrder?.routeProgress ?? 0,
+  };
+  const canShowRouteMap = hasRouteMap(order);
 
   useEffect(() => {
     document.title = "Order Tracking - Otter Delivery";
@@ -41,14 +51,22 @@ export default function OrderTrackingPage() {
   useEffect(() => {
     let cancelled = false;
 
+    if (!shouldRequestBackendTracking(storedOrder)) {
+      setTracking(null);
+      return undefined;
+    }
+
     getOrderTracking(id)
       .then((nextTracking) => {
         if (!cancelled) {
           setTracking(nextTracking);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
+          if (isTrackingNotFoundError(error)) {
+            markTrackingUnavailable(id);
+          }
           setTracking(null);
         }
       });
@@ -56,7 +74,7 @@ export default function OrderTrackingPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, markTrackingUnavailable, storedOrder]);
 
   useEffect(() => {
     if (storedOrder) {
@@ -85,7 +103,7 @@ export default function OrderTrackingPage() {
         <TrackingStatusHeader order={order} />
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-          {simulation ? (
+          {simulation || canShowRouteMap ? (
             <DeliveryMap order={order} />
           ) : (
             <PendingTrackingPanel order={order} />
@@ -100,11 +118,20 @@ export default function OrderTrackingPage() {
   );
 }
 
+function shouldRequestBackendTracking(storedOrder) {
+  return Boolean(
+    storedOrder?.assignmentStatus === "assigned" &&
+      storedOrder.trackingStartedAt &&
+      (storedOrder.assignment || storedOrder.assignedDriver),
+  );
+}
+
 function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
   if (String(storedOrder?.id) !== String(id)) {
     return fallbackOrder;
   }
 
+  const assignmentStatus = storedOrder.assignmentStatus;
   const assignedDriverName =
     storedOrder.assignedDriver?.name ?? "Driver pending";
   const hasTracking = tracking?.assignment || tracking?.events?.length > 0;
@@ -121,18 +148,17 @@ function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
     rider: {
       name: assignedDriverName,
     },
-    statusText: hasTracking ? "Driver assigned" : "Preparing order",
-    statusTitle:
-      storedOrder.assignmentStatus === "assigned"
-        ? "Driver accepted your order"
-        : "Your order is being prepared",
+    statusText: getStatusText(assignmentStatus, hasTracking),
+    statusTitle: getStatusTitle(assignmentStatus),
     estimatedArrival:
       storedOrder.estimatedDeliveryTime ?? routeEstimate?.etaLabel ?? "Pending",
     routePoints: routeEstimate?.routePoints,
     encodedPolyline: routeEstimate?.encodedPolyline,
     routeProvider:
       routeEstimate?.provider ??
-      (storedOrder.assignmentStatus === "assigned"
+      (storedOrder.assignmentStatus === "assigned" ||
+      storedOrder.assignmentStatus === "failed" ||
+      storedOrder.assignmentStatus === "pending"
         ? "coordinate_fallback"
         : null),
     routeDurationSeconds: routeEstimate?.durationSeconds,
@@ -157,6 +183,41 @@ function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
   };
 }
 
+function getStatusText(assignmentStatus, hasTracking) {
+  if (hasTracking) {
+    return "Driver assigned";
+  }
+  if (assignmentStatus === "failed") {
+    return "Driver assignment temporarily unavailable";
+  }
+  return "Preparing order";
+}
+
+function getStatusTitle(assignmentStatus) {
+  if (assignmentStatus === "assigned") {
+    return "Driver accepted your order";
+  }
+  if (assignmentStatus === "failed") {
+    return "We are still assigning a driver";
+  }
+  return "Your order is being prepared";
+}
+
+function hasRouteMap(order) {
+  const pickupLocation = normalizeRoutePoint(order?.pickupLocation);
+  const deliveryLocation = normalizeRoutePoint(order?.deliveryLocation);
+  return Boolean(
+    pickupLocation &&
+      deliveryLocation &&
+      getRoutePoints({
+        pickupLocation,
+        deliveryLocation,
+        routePoints: order?.routePoints,
+        encodedPolyline: order?.encodedPolyline,
+      }).length >= 2,
+  );
+}
+
 function PendingTrackingPanel({ order }) {
   return (
     <div className="lg:col-span-2 flex min-h-[460px] items-center justify-center rounded-xl border border-surface bg-surface-container-lowest p-8 text-center shadow-[0_12px_32px_rgba(36,36,38,0.04)] lg:min-h-[620px]">
@@ -168,8 +229,8 @@ function PendingTrackingPanel({ order }) {
           Preparing your order
         </h2>
         <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
-          Tracking for order #{order.displayId} will appear after a driver is
-          assigned. No sample route or driver location is being shown.
+          Tracking map for order #{order.displayId} will appear once route
+          information is available. No sample driver location is being shown.
         </p>
       </div>
     </div>

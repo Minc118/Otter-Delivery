@@ -34,9 +34,12 @@ export default function DeliveryMap({ order }) {
     order.id,
     [pickupPoint, ...routePoints, destinationPoint].filter(Boolean),
   );
+  const hasRouteGeometry = Boolean(
+    pickupPoint && destinationPoint && routePoints.length >= 2,
+  );
 
   useEffect(() => {
-    if (!mapContainerRef.current) {
+    if (!hasRouteGeometry || !mapContainerRef.current) {
       return undefined;
     }
 
@@ -105,12 +108,12 @@ export default function DeliveryMap({ order }) {
       mapRef.current = null;
       map?.remove();
     };
-  }, []);
+  }, [hasRouteGeometry]);
 
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapRef.current;
-    if (!L || !map || routePoints.length < 2) {
+    if (!L || !map || !hasRouteGeometry) {
       return;
     }
 
@@ -214,7 +217,7 @@ export default function DeliveryMap({ order }) {
     ]);
     map.invalidateSize({ animate: false, pan: false });
     fitMapToRoute(map, routeBoundsRef.current);
-  }, [destinationLabel, mapGeneration, routeGeometryKey]);
+  }, [destinationLabel, hasRouteGeometry, mapGeneration, routeGeometryKey]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -248,14 +251,18 @@ export default function DeliveryMap({ order }) {
   useEffect(() => {
     const completedRoute = completedRouteRef.current;
     const remainingRoute = remainingRouteRef.current;
-    if (!completedRoute || !remainingRoute) {
+    if (!completedRoute || !remainingRoute || !hasRouteGeometry) {
       return;
     }
 
     const segments = splitRouteAtProgress(routePoints, order.routeProgress);
     completedRoute.setLatLngs(toCoordinatePairs(segments.completed));
     remainingRoute.setLatLngs(toCoordinatePairs(segments.remaining));
-  }, [mapGeneration, order.routeProgress, routeGeometryKey]);
+  }, [hasRouteGeometry, mapGeneration, order.routeProgress, routeGeometryKey]);
+
+  if (!hasRouteGeometry) {
+    return <TrackingMapUnavailablePanel />;
+  }
 
   return (
     <div className="lg:col-span-2 flex min-w-0 flex-col gap-4">
@@ -310,6 +317,24 @@ export default function DeliveryMap({ order }) {
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TrackingMapUnavailablePanel() {
+  return (
+    <div className="lg:col-span-2 flex min-h-[460px] items-center justify-center rounded-xl border border-surface bg-surface-container-lowest p-8 text-center shadow-[0_12px_32px_rgba(36,36,38,0.04)] lg:min-h-[620px]">
+      <div className="max-w-md">
+        <span className="material-symbols-outlined mb-4 text-5xl text-primary">
+          map
+        </span>
+        <h2 className="font-section-title text-section-title text-on-surface">
+          Route information pending
+        </h2>
+        <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
+          Tracking map will appear once route information is available.
+        </p>
       </div>
     </div>
   );

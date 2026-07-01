@@ -13,47 +13,52 @@ public class OrderResponseDTO {
     private LocalDateTime createdAt;
     private List<OrderItemDTO> items;
 
-    public OrderResponseDTO() {
-    }
-
     public Long getId() {
         return id;
-    }
-
-    public Long getCustomerId() {
-        return customerId;
-    }
-
-    public Long getRestaurantId() {
-        return restaurantId;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public double getTotalPrice() {
-        return totalPrice;
     }
 
     public void setId(Long id) {
         this.id = id;
     }
 
+    public Long getCustomerId() {
+        return customerId;
+    }
+
     public void setCustomerId(Long customerId) {
         this.customerId = customerId;
+    }
+
+    public Long getRestaurantId() {
+        return restaurantId;
     }
 
     public void setRestaurantId(Long restaurantId) {
         this.restaurantId = restaurantId;
     }
 
+    public String getStatus() {
+        return status;
+    }
+
     public void setStatus(String status) {
         this.status = status;
     }
 
+    public double getTotalPrice() {
+        return totalPrice;
+    }
+
     public void setTotalPrice(double totalPrice) {
         this.totalPrice = totalPrice;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     public List<OrderItemDTO> getItems() {

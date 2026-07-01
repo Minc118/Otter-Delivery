@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import PageShell from "../components/layout/PageShell.jsx";
-import { getOrders } from "../services/profileService.js";
+import {
+  getOrders,
+  isProfileServiceUnavailable,
+} from "../services/profileService.js";
 import { searchLiveRestaurantRecommendations } from "../services/recommendationService.js";
 import { getRestaurantById } from "../services/catalogService.js";
 import ProfileSummary from "../components/profile/ProfileSummary.jsx";
@@ -38,6 +41,7 @@ export default function ProfilePage() {
   const [recommendations, setRecommendations] = useState([]);
   const [restaurantNames, setRestaurantNames] = useState({});
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
   const [activeSettingsSection, setActiveSettingsSection] = useState("account");
 
   useEffect(() => {
@@ -52,16 +56,29 @@ export default function ProfilePage() {
       }
 
       setProfile(storedProfile);
+      let loadedOrders = [];
 
       try {
-        const loadedOrders = await getOrders(storedProfile.id);
+        loadedOrders = await getOrders(storedProfile.id);
         setOrders(loadedOrders);
+      } catch (error) {
+        setProfileError(
+            isProfileServiceUnavailable(error)
+                ? "Profile service is currently unavailable"
+                : "Profile data could not be loaded",
+        );
+      }
 
+      try {
         const loadedRecommendations =
             await searchLiveRestaurantRecommendations();
 
         setRecommendations(loadedRecommendations.recommendations);
+      } catch {
+        setRecommendations([]);
+      }
 
+      try {
         const names = {};
 
         for (const order of loadedOrders) {
@@ -72,8 +89,8 @@ export default function ProfilePage() {
         }
 
         setRestaurantNames(names);
-      } catch (error) {
-        console.error("Could not load profile page data", error);
+      } catch {
+        setRestaurantNames({});
       } finally {
         setLoading(false);
       }
@@ -138,6 +155,14 @@ export default function ProfilePage() {
             />
 
             <main className="md:col-span-8 space-y-gutter">
+              {profileError ? (
+                  <section className="bg-white rounded-2xl border border-surface p-4 shadow-sm">
+                    <p className="font-body-md text-body-md text-on-surface-variant">
+                      {profileError}
+                    </p>
+                  </section>
+              ) : null}
+
               <ProfileSettingsDetails
                   activeSection={activeSettingsSection}
                   settings={profileSettings}

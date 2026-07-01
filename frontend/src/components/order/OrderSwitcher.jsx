@@ -66,11 +66,16 @@ export default function OrderSwitcher({
 
 function formatOrderLabel(order, orderId, timing) {
   const displayId = String(order.displayId ?? orderId).replace(/^ORDER-/i, "");
-  return `Order #${displayId} · ${getTimingLabel(timing)}`;
+  return `Order #${displayId} · ${getTimingLabel(timing, order)}`;
 }
 
-function getTimingLabel(timing) {
-  if (!timing || timing.phase === "DELIVERED") {
+function getTimingLabel(timing, order) {
+  if (!timing) {
+    return order.assignmentStatus === "failed"
+      ? "Assigning driver"
+      : "Preparing";
+  }
+  if (timing.phase === "DELIVERED") {
     return "Delivered";
   }
   if (timing.phase === "PICKING_UP") {

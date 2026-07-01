@@ -15,7 +15,10 @@ async function requestDriverService(path, options = {}) {
   if (!response.ok) {
     const message =
       payload?.error?.message ?? "Driver Service request failed.";
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.code = payload?.error?.code;
+    throw error;
   }
 
   return payload;
@@ -37,4 +40,8 @@ export function estimateDelivery({ orderId, pickupLocation, customerLocation }) 
 
 export function getOrderTracking(orderId) {
   return requestDriverService(`/orders/${orderId}/tracking`);
+}
+
+export function isTrackingNotFoundError(error) {
+  return error?.status === 404 && error?.code === "TRACKING_NOT_FOUND";
 }

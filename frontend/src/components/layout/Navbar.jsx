@@ -30,17 +30,20 @@ export default function Navbar({
     [now, trackedDeliveries],
   );
   const activeDeliveries = deliverySummaries.filter(
-    (entry) => entry.timing?.phase !== "DELIVERED",
+    (entry) => entry.timing && entry.timing.phase !== "DELIVERED",
+  );
+  const activePendingTrackedOrder = (trackedOrders ?? []).find(
+    (order) =>
+      String(order.id) === String(activeOrderId) &&
+      !order.deliveredAt &&
+      ["pending", "failed"].includes(order.assignmentStatus),
   );
   const activeDelivery =
     activeDeliveries.find(
       (entry) => entry.simulationOrder.id === String(activeOrderId),
-    ) ?? activeDeliveries[0];
+    ) ?? (activePendingTrackedOrder ? null : activeDeliveries[0]);
   const activeTrackedOrder =
-    (trackedOrders ?? []).find(
-      (order) =>
-        String(order.id) === String(activeOrderId) && !order.deliveredAt,
-    ) ??
+    activePendingTrackedOrder ??
     (trackedOrders ?? []).find(
       (order) =>
         order?.id != null &&
