@@ -1,7 +1,10 @@
 import { useState } from "react";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
-import { updateProfile } from "../../services/profileService.js";
+import {
+    isProfileServiceUnavailable,
+    updateProfile,
+} from "../../services/profileService.js";
 import {
     getUserPreferences,
     updateUserPreferences,
@@ -308,8 +311,11 @@ function AccountSettings({ user }) {
             localStorage.setItem("profile", JSON.stringify(updatedProfile));
             setMessage("Profile updated successfully.");
         } catch (error) {
-            console.error(error);
-            setMessage("Could not update profile.");
+            setMessage(
+                isProfileServiceUnavailable(error)
+                    ? "Profile service is currently unavailable"
+                    : "Could not update profile.",
+            );
         } finally {
             setSaving(false);
         }

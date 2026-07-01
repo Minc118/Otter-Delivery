@@ -1,45 +1,63 @@
-const PROFILE_API_BASE_URL = "http://localhost:8006";
+const PROFILE_API_BASE_URL =
+    import.meta.env.VITE_PROFILE_SERVICE_URL ?? "http://localhost:8006";
 
-export async function login(username) {
-    const response = await fetch(
-        `${PROFILE_API_BASE_URL}/profiles/login/${username}`
-    );
+export class ProfileServiceUnavailableError extends Error {
+    constructor() {
+        super("Profile service is currently unavailable");
+        this.name = "ProfileServiceUnavailableError";
+    }
+}
 
-    if (!response.ok) {
-        throw new Error("Profile not found");
+export class ProfileNotFoundError extends Error {
+    constructor() {
+        super("Profile not found");
+        this.name = "ProfileNotFoundError";
+    }
+}
+
+async function requestProfileService(path, options = {}) {
+    let response;
+
+    try {
+        response = await fetch(`${PROFILE_API_BASE_URL}${path}`, {
+            headers: {
+                "Content-Type": "application/json",
+                ...options.headers,
+            },
+            ...options,
+        });
+    } catch {
+        throw new ProfileServiceUnavailableError();
     }
 
-    return await response.json();
+    if (response.status === 404) {
+        throw new ProfileNotFoundError();
+    }
+
+    if (!response.ok) {
+        throw new Error("Profile Service request failed");
+    }
+
+    return response.json();
+}
+
+export function isProfileServiceUnavailable(error) {
+    return error instanceof ProfileServiceUnavailableError;
+}
+
+export async function login(username) {
+    return requestProfileService(
+        `/profiles/login/${encodeURIComponent(username)}`,
+    );
 }
 
 export async function getOrders(profileId) {
-    const response = await fetch(
-        `${PROFILE_API_BASE_URL}/profiles/${profileId}/orders`
-    );
-
-    if (!response.ok) {
-        throw new Error("Could not load orders");
-    }
-
-    return await response.json();
+    return requestProfileService(`/profiles/${profileId}/orders`);
 }
 
 export async function updateProfile(profileId, profile) {
-    const response = await fetch(
-        `${PROFILE_API_BASE_URL}/profiles/${profileId}`,
-        {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(profile),
-        },
-    );
-
-    if (!response.ok) {
-        throw new Error("Could not update profile");
-    }
-
-    return await response.json();
+    return requestProfileService(`/profiles/${profileId}`, {
+        method: "PUT",
+        body: JSON.stringify(profile),
+    });
 }
-

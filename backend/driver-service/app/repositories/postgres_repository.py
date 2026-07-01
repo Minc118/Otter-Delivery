@@ -1,5 +1,5 @@
 import psycopg
-from psycopg.errors import UniqueViolation
+from psycopg.errors import UndefinedColumn, UndefinedTable, UniqueViolation
 from psycopg.rows import dict_row
 
 from app.errors import ConflictError, NotFoundError
@@ -140,20 +140,29 @@ class PostgresDriverRepository:
                 return existing, self._get_driver_with_cursor(cursor, existing.driver_id), False
 
     def get_tracking(self, order_id: str) -> TrackingResponse:
-        with self._connect() as connection, connection.cursor() as cursor:
-            assignment = self._find_assignment(cursor, order_id)
-            cursor.execute(
-                """SELECT id, order_id, assignment_id, driver_id, event_type,
-                          message, lat, lng, created_at
-                   FROM tracking_events WHERE order_id = %s ORDER BY created_at ASC""",
-                (order_id,),
-            )
-            events = [_event_from_row(row) for row in cursor.fetchall()]
-            if assignment is None and not events:
-                raise NotFoundError(
-                    "TRACKING_NOT_FOUND", "Order tracking data could not be found."
+        try:
+            with self._connect() as connection, connection.cursor() as cursor:
+                assignment = self._find_assignment(cursor, order_id)
+                cursor.execute(
+                    """SELECT id, order_id, assignment_id, driver_id, event_type,
+                              message, lat, lng, created_at
+                       FROM tracking_events WHERE order_id = %s ORDER BY created_at ASC""",
+                    (order_id,),
                 )
-            return TrackingResponse(order_id=order_id, assignment=assignment, events=events)
+                events = [_event_from_row(row) for row in cursor.fetchall()]
+                if assignment is None and not events:
+                    raise NotFoundError(
+                        "TRACKING_NOT_FOUND", "Order tracking data could not be found."
+                    )
+                return TrackingResponse(
+                    order_id=order_id,
+                    assignment=assignment,
+                    events=events,
+                )
+        except (KeyError, UndefinedColumn, UndefinedTable):
+            raise NotFoundError(
+                "TRACKING_NOT_FOUND", "Order tracking data could not be found."
+            )
 
     def save_route_estimate(self, estimate: RouteEstimate) -> RouteEstimate:
         with self._connect() as connection, connection.cursor() as cursor:

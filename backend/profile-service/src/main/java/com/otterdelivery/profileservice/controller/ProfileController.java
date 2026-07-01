@@ -1,12 +1,21 @@
 package com.otterdelivery.profileservice.controller;
 
+import com.otterdelivery.profileservice.dto.OrderResponseDTO;
 import com.otterdelivery.profileservice.model.Profile;
 import com.otterdelivery.profileservice.service.ProfileService;
-import org.springframework.web.bind.annotation.*;
-import com.otterdelivery.profileservice.dto.OrderResponseDTO;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"})
 @RestController
 @RequestMapping("/profiles")
 public class ProfileController {
@@ -28,14 +37,16 @@ public class ProfileController {
     }
 
     @GetMapping("/{id}")
-    public Profile getProfileById(@PathVariable Long id) {
-        return profileService.getProfileById(id);
+    public ResponseEntity<Profile> getProfileById(@PathVariable Long id) {
+        return ResponseEntity.of(profileService.getProfileById(id));
     }
 
     @PutMapping("/{id}")
-    public Profile updateProfile(@PathVariable Long id,
-                                 @RequestBody Profile profile) {
-        return profileService.updateProfile(id, profile);
+    public ResponseEntity<Profile> updateProfile(
+        @PathVariable Long id,
+        @RequestBody Profile profile
+    ) {
+        return ResponseEntity.of(profileService.updateProfile(id, profile));
     }
 
     @DeleteMapping("/{id}")
@@ -49,7 +60,7 @@ public class ProfileController {
     }
 
     @GetMapping("/login/{username}")
-    public Profile loginByUsername(@PathVariable String username) {
-        return profileService.getProfileByUsername(username);
+    public ResponseEntity<Profile> loginByUsername(@PathVariable String username) {
+        return ResponseEntity.of(profileService.getProfileByUsername(username));
     }
 }

@@ -12,11 +12,13 @@ services:
       VITE_DRIVER_API_URL: http://localhost:${DRIVER_SERVICE_PORT:-8003}
       VITE_RESTAURANT_SERVICE_URL: http://localhost:${RESTAURANT_SERVICE_PORT:-8001}
       VITE_ORDER_SERVICE_URL: http://localhost:${ORDER_SERVICE_PORT:-8002}
+      VITE_PROFILE_SERVICE_URL: http://localhost:${PROFILE_SERVICE_PORT:-8006}
       VITE_RECOMMENDATION_API_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
       VITE_RECOMMENDATION_SERVICE_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
     depends_on:
       - restaurant-service
       - order-service
+      - profile-service
       - driver-service
       - recommendation-service
 
@@ -49,11 +51,26 @@ services:
       - "${DRIVER_SERVICE_PORT:-8003}:8003"
     environment:
       PORT: 8003
+      DRIVER_REPOSITORY_MODE: memory
       DRIVER_DATABASE_URL: ${DRIVER_DATABASE_URL:-}
       DATABASE_URL: ${DATABASE_URL:-}
       ETA_MINUTES: 40
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       GOOGLE_ROUTES_API_KEY: ${GOOGLE_ROUTES_API_KEY:-}
+
+  profile-service:
+    build:
+      context: ./backend/profile-service
+    ports:
+      - "${PROFILE_SERVICE_PORT:-8006}:8006"
+    environment:
+      SERVER_PORT: 8006
+      ORDER_SERVICE_URL: http://order-service:8002
+      PROFILE_DATABASE_URL: ${PROFILE_DATABASE_URL:-jdbc:h2:mem:profiles;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+      PROFILE_DATABASE_USERNAME: ${PROFILE_DATABASE_USERNAME:-sa}
+      PROFILE_DATABASE_PASSWORD: ${PROFILE_DATABASE_PASSWORD:-}
+    depends_on:
+      - order-service
 
   recommendation-service:
     build:
@@ -74,13 +91,20 @@ services:
     depends_on:
       - restaurant-service
 
+  translation-service:
+    build:
+      context: ./backend/translation-service
+    ports:
+      - "${TRANSLATION_SERVICE_PORT:-8005}:8005"
+    environment:
+      SERVER_PORT: 8005
+      RESTAURANT_SERVICE_BASE_URL: http://restaurant-service:8001/api
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
+      DEEPL_BASE_URL: ${DEEPL_BASE_URL:-https://api-free.deepl.com/v2/translate}
+    depends_on:
+      - restaurant-service
+
   # Placeholder teammate services, not implemented yet:
-  # translation-service:
-  #   build:
-  #     context: ./backend/translation-service
-  #   ports:
-  #     - "8005:8005"
-  #
   # auth-service:
   #   image: quay.io/keycloak/keycloak:latest
   #   ports:

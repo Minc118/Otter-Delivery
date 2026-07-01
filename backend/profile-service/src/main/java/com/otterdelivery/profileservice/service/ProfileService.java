@@ -1,24 +1,30 @@
 package com.otterdelivery.profileservice.service;
 
+import com.otterdelivery.profileservice.dto.OrderResponseDTO;
 import com.otterdelivery.profileservice.model.Profile;
 import com.otterdelivery.profileservice.repository.ProfileRepository;
-import jakarta.persistence.Column;
-import org.springframework.stereotype.Service;
-import com.otterdelivery.profileservice.dto.OrderResponseDTO;
-import org.springframework.web.client.RestTemplate;
 import java.util.Arrays;
-
 import java.util.List;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 public class ProfileService {
 
+    private final String orderServiceUrl;
     private final ProfileRepository profileRepository;
-    @Column(unique = true, nullable = false)
-    private String username;
+    private final RestTemplate restTemplate;
 
-    public ProfileService(ProfileRepository profileRepository) {
+    public ProfileService(
+        ProfileRepository profileRepository,
+        @Value("${order.service.url}") String orderServiceUrl
+    ) {
         this.profileRepository = profileRepository;
+        this.orderServiceUrl = orderServiceUrl;
+        this.restTemplate = new RestTemplate();
     }
 
     public Profile createProfile(Profile profile) {
@@ -29,57 +35,41 @@ public class ProfileService {
         return profileRepository.findAll();
     }
 
-    public Profile getProfileById(Long id) {
-        return profileRepository.findById(id).orElse(null);
+    public Optional<Profile> getProfileById(Long id) {
+        return profileRepository.findById(id);
     }
 
-    public String getUsername() {
-        return username;
+    public Optional<Profile> updateProfile(Long id, Profile newProfileData) {
+        return profileRepository.findById(id).map(profile -> {
+            profile.setFirstName(newProfileData.getFirstName());
+            profile.setLastName(newProfileData.getLastName());
+            profile.setUsername(newProfileData.getUsername());
+            profile.setEmail(newProfileData.getEmail());
+            profile.setPhoneNumber(newProfileData.getPhoneNumber());
+            profile.setStreet(newProfileData.getStreet());
+            profile.setCity(newProfileData.getCity());
+            profile.setPostalCode(newProfileData.getPostalCode());
+            return profileRepository.save(profile);
+        });
     }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public Profile updateProfile(Long id, Profile newProfileData) {
-        Profile profile = getProfileById(id);
-
-        if (profile == null) {
-            return null;
-        }
-
-        profile.setFirstName(newProfileData.getFirstName());
-        profile.setLastName(newProfileData.getLastName());
-        profile.setUsername(newProfileData.getUsername());
-        profile.setEmail(newProfileData.getEmail());
-        profile.setPhoneNumber(newProfileData.getPhoneNumber());
-        profile.setStreet(newProfileData.getStreet());
-        profile.setCity(newProfileData.getCity());
-        profile.setPostalCode(newProfileData.getPostalCode());
-
-        return profileRepository.save(profile);
-    }
-
-    private final RestTemplate restTemplate = new RestTemplate();
 
     public List<OrderResponseDTO> getOrdersForProfile(Long profileId) {
-        String url = "http://localhost:8002/orders/customer/" + profileId;
+        String url = orderServiceUrl + "/orders/customer/" + profileId;
 
-        OrderResponseDTO[] orders =
+        try {
+            OrderResponseDTO[] orders =
                 restTemplate.getForObject(url, OrderResponseDTO[].class);
-
-        if (orders == null) {
+            return orders == null ? List.of() : Arrays.asList(orders);
+        } catch (RestClientException error) {
             return List.of();
         }
-
-        return Arrays.asList(orders);
     }
 
     public void deleteProfile(Long id) {
         profileRepository.deleteById(id);
     }
 
-    public Profile getProfileByUsername(String username) {
-        return profileRepository.findByUsername(username).orElse(null);
+    public Optional<Profile> getProfileByUsername(String username) {
+        return profileRepository.findByUsername(username);
     }
 }

@@ -16,6 +16,10 @@ import {
 } from "../services/driverService.js";
 import { checkoutDeliveryAddress } from "../data/checkout.js";
 import { createDeliveryEtaModel } from "../services/deliveryEta.js";
+import {
+  isRecentActiveTrackedOrder,
+  sanitizeTrackedOrdersById,
+} from "../services/trackingState.js";
 import { getCartItemCount } from "../utils/cartTotals.js";
 import { priceToCents } from "../utils/currency.js";
 
@@ -47,19 +51,51 @@ function storeValue(key, value) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-function readInitialTrackedOrders() {
+function removeStoredValue(key) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(key);
+}
+
+function readInitialTrackingSnapshot() {
+  const activeOrderId = readStoredValue(ACTIVE_ORDER_ID_STORAGE_KEY, null);
   const storedOrders = readStoredValue(TRACKED_ORDERS_STORAGE_KEY, null);
+
   if (storedOrders && typeof storedOrders === "object") {
-    return storedOrders;
+    const sanitizedOrders = sanitizeTrackedOrdersById(storedOrders, activeOrderId);
+    storeValue(TRACKED_ORDERS_STORAGE_KEY, sanitizedOrders);
+    return {
+      activeOrderId: sanitizedOrders[String(activeOrderId)]
+        ? activeOrderId
+        : null,
+      ordersById: sanitizedOrders,
+    };
   }
 
   const legacyOrder = readStoredValue(LAST_ORDER_STORAGE_KEY, null);
-  return legacyOrder?.id ? { [String(legacyOrder.id)]: legacyOrder } : {};
+  const legacyOrders = legacyOrder?.id
+    ? sanitizeTrackedOrdersById(
+        { [String(legacyOrder.id)]: legacyOrder },
+        activeOrderId,
+      )
+    : {};
+
+  if (Object.keys(legacyOrders).length > 0) {
+    storeValue(TRACKED_ORDERS_STORAGE_KEY, legacyOrders);
+  }
+
+  return {
+    activeOrderId: legacyOrders[String(activeOrderId)] ? activeOrderId : null,
+    ordersById: legacyOrders,
+  };
 }
 
 export const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [cartWarning, setCartWarning] = useState(null);
+  const [initialTrackingSnapshot] = useState(readInitialTrackingSnapshot);
   const initialCartGroups = getInitialCartGroups();
   const deliveryFeeCents = getDeliveryFeeCents();
   const [cartGroups, setCartGroups] = useState(initialCartGroups);
@@ -70,10 +106,10 @@ export function CartProvider({ children }) {
     readStoredValue(DELIVERY_ADDRESS_STORAGE_KEY, checkoutDeliveryAddress),
   );
   const [trackedOrdersById, setTrackedOrdersById] = useState(() =>
-    readInitialTrackedOrders(),
+    initialTrackingSnapshot.ordersById,
   );
   const [activeOrderId, setActiveOrderId] = useState(() =>
-    readStoredValue(ACTIVE_ORDER_ID_STORAGE_KEY, null),
+    initialTrackingSnapshot.activeOrderId,
   );
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(
     initialCartGroups[0]?.restaurantId ?? null,
@@ -161,6 +197,56 @@ export function CartProvider({ children }) {
     setActiveOrderId(normalizedId);
     storeValue(ACTIVE_ORDER_ID_STORAGE_KEY, normalizedId);
     storeValue(LAST_ORDER_STORAGE_KEY, trackedOrdersById[normalizedId]);
+  }
+
+  function markTrackingUnavailable(orderId) {
+    const normalizedId = String(orderId);
+
+    setTrackedOrdersById((currentOrders) => {
+      const currentOrder = currentOrders[normalizedId];
+      if (!currentOrder) {
+        return currentOrders;
+      }
+
+      if (isRecentActiveTrackedOrder(currentOrder, activeOrderId)) {
+        const pendingOrder = {
+          ...currentOrder,
+          assignedDriver: undefined,
+          assignment: undefined,
+          assignmentStatus: "pending",
+          deliveryEta: undefined,
+          routeEstimate: undefined,
+          trackingStartedAt: undefined,
+        };
+        const nextOrders = {
+          ...currentOrders,
+          [normalizedId]: pendingOrder,
+        };
+        storeValue(TRACKED_ORDERS_STORAGE_KEY, nextOrders);
+        storeValue(LAST_ORDER_STORAGE_KEY, pendingOrder);
+        return nextOrders;
+      }
+
+      const nextOrders = { ...currentOrders };
+      delete nextOrders[normalizedId];
+      storeValue(TRACKED_ORDERS_STORAGE_KEY, nextOrders);
+
+      if (String(activeOrderId) === normalizedId) {
+        const nextActiveOrder = Object.values(nextOrders)[0] ?? null;
+        if (nextActiveOrder) {
+          const nextActiveOrderId = String(nextActiveOrder.id);
+          setActiveOrderId(nextActiveOrderId);
+          storeValue(ACTIVE_ORDER_ID_STORAGE_KEY, nextActiveOrderId);
+          storeValue(LAST_ORDER_STORAGE_KEY, nextActiveOrder);
+        } else {
+          setActiveOrderId(null);
+          removeStoredValue(ACTIVE_ORDER_ID_STORAGE_KEY);
+          removeStoredValue(LAST_ORDER_STORAGE_KEY);
+        }
+      }
+
+      return nextOrders;
+    });
   }
 
   function removeEmptyGroups(groups) {
@@ -368,8 +454,11 @@ export function CartProvider({ children }) {
     const orderId = String(backendOrder.id);
     const placedOrder = {
       id: orderId,
+      assignmentStatus: "pending",
       createdAt: Date.now(),
+      deliveryLocation: toDriverLocation(deliveryAddress),
       displayId: `ORDER-${backendOrder.id}`,
+      estimatedDeliveryTime: "approx. 40 min",
       restaurantId: group.restaurantId,
       restaurantName: group.restaurantName,
       restaurantImage: restaurantMeta.image,
@@ -379,8 +468,7 @@ export function CartProvider({ children }) {
       pickupLocation,
       deliveryFeeCents,
       totalCents: Math.round(backendOrder.totalPrice * 100),
-      estimatedDeliveryTime: "approx. 40 min",
-      assignmentStatus: "pending",
+      trackingStatus: "DRIVER_ASSIGNMENT_PENDING",
     };
 
     rememberPlacedOrder(placedOrder);
@@ -425,9 +513,9 @@ export function CartProvider({ children }) {
       const unassignedOrder = {
         ...placedOrder,
         assignmentStatus: "failed",
+        trackingStatus: "DRIVER_ASSIGNMENT_UNAVAILABLE",
       };
 
-      console.warn("Driver assignment unavailable; the order remains placed.");
       rememberPlacedOrder(unassignedOrder);
       return unassignedOrder;
     }
@@ -447,6 +535,7 @@ export function CartProvider({ children }) {
       lastPlacedOrder,
       activeOrderId,
       markDeliveryDelivered,
+      markTrackingUnavailable,
       placeCheckoutOrder,
       removeItem,
       removeRestaurant,

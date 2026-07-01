@@ -4,6 +4,10 @@ import {
   normalizeRoutePoint,
 } from "./routeGeometry.js";
 
+const DELIVERED_STORAGE_GRACE_PERIOD_MS = 15 * 60 * 1000;
+const PENDING_STORAGE_GRACE_PERIOD_MS = 2 * 60 * 60 * 1000;
+const RECENT_ACTIVE_ORDER_GRACE_PERIOD_MS = 15 * 60 * 1000;
+
 export function getTrackedDeliveryOrder(order) {
   const id = normalizeId(order?.id ?? order?.orderId);
   const trackingStartedAt = Number(order?.trackingStartedAt);
@@ -68,14 +72,144 @@ export function getTrackedDeliveryOrders(orders) {
   return (Array.isArray(orders) ? orders : [])
     .map((order) => ({
       order,
-      simulationOrder: getTrackedDeliveryOrder(order),
+      simulationOrder:
+        getTrackedDeliveryOrder(order) ?? getLocalTrackedDeliveryOrder(order),
     }))
     .filter((entry) => entry.simulationOrder)
     .sort(
       (left, right) =>
-        right.simulationOrder.trackingStartedAt -
-        left.simulationOrder.trackingStartedAt,
+        getTrackedOrderSortTime(right.order) - getTrackedOrderSortTime(left.order),
     );
+}
+
+function getLocalTrackedDeliveryOrder(order) {
+  const id = normalizeId(order?.id ?? order?.orderId);
+  const assignmentStatus = normalizeAssignmentStatus(order?.assignmentStatus);
+  const pickupLocation = normalizeRoutePoint(order?.pickupLocation);
+  const deliveryLocation = normalizeRoutePoint(
+    order?.deliveryLocation ?? toDeliveryLocation(order?.deliveryAddress),
+  );
+  const routePoints = getRoutePoints({
+    pickupLocation,
+    deliveryLocation,
+    routePoints: order?.routePoints,
+  });
+
+  if (!id || !assignmentStatus) {
+    return null;
+  }
+
+  return {
+    id,
+    assignmentStatus,
+    deliveredAt: normalizeTimestamp(order.deliveredAt),
+    etaModel: normalizeDeliveryEtaModel(order.deliveryEta),
+    pickupLocation,
+    deliveryLocation,
+    routePoints,
+    trackingStartedAt: normalizeTimestamp(order.trackingStartedAt),
+  };
+}
+
+export function sanitizeTrackedOrdersById(
+  storedOrders,
+  activeOrderId,
+  now = Date.now(),
+) {
+  if (!storedOrders || typeof storedOrders !== "object") {
+    return {};
+  }
+
+  return Object.values(storedOrders).reduce((ordersById, order) => {
+    const sanitizedOrder = sanitizeTrackedOrder(order, activeOrderId, now);
+    if (sanitizedOrder) {
+      ordersById[String(sanitizedOrder.id)] = sanitizedOrder;
+    }
+    return ordersById;
+  }, {});
+}
+
+export function isRecentActiveTrackedOrder(
+  order,
+  activeOrderId,
+  now = Date.now(),
+) {
+  const id = normalizeId(order?.id ?? order?.orderId);
+  const createdAt = normalizeTimestamp(
+    order?.createdAt ?? order?.trackingStartedAt,
+  );
+
+  return Boolean(
+    id &&
+      String(activeOrderId) === id &&
+      createdAt &&
+      now - createdAt <= RECENT_ACTIVE_ORDER_GRACE_PERIOD_MS,
+  );
+}
+
+function sanitizeTrackedOrder(order, activeOrderId, now) {
+  if (!order || typeof order !== "object") {
+    return null;
+  }
+
+  const id = normalizeId(order.id ?? order.orderId);
+  const createdAt = normalizeTimestamp(order.createdAt);
+  const trackingStartedAt = normalizeTimestamp(order.trackingStartedAt);
+  const deliveredAt = normalizeTimestamp(order.deliveredAt);
+  const assignmentStatus = normalizeAssignmentStatus(order.assignmentStatus);
+  const isActiveOrder = id && String(activeOrderId) === id;
+
+  if (!id || !assignmentStatus || (!createdAt && !trackingStartedAt)) {
+    return null;
+  }
+
+  if (
+    deliveredAt &&
+    now - deliveredAt > DELIVERED_STORAGE_GRACE_PERIOD_MS &&
+    !isActiveOrder
+  ) {
+    return null;
+  }
+
+  if (
+    ["pending", "failed"].includes(assignmentStatus) &&
+    createdAt &&
+    now - createdAt > PENDING_STORAGE_GRACE_PERIOD_MS &&
+    !isActiveOrder
+  ) {
+    return null;
+  }
+
+  if (
+    assignmentStatus === "assigned" &&
+    (!trackingStartedAt || (!order.assignment && !order.assignedDriver))
+  ) {
+    return null;
+  }
+
+  return {
+    ...order,
+    assignmentStatus,
+    createdAt: createdAt ?? trackingStartedAt,
+    deliveredAt: deliveredAt ?? undefined,
+    id,
+    trackingStartedAt: trackingStartedAt ?? undefined,
+  };
+}
+
+function normalizeAssignmentStatus(status) {
+  const normalizedStatus = String(status ?? "").toLowerCase();
+  return ["assigned", "failed", "pending"].includes(normalizedStatus)
+    ? normalizedStatus
+    : null;
+}
+
+function getTrackedOrderSortTime(order) {
+  return (
+    normalizeTimestamp(order?.trackingStartedAt) ??
+    normalizeTimestamp(order?.createdAt) ??
+    0
+  );
 }
 
 export function normalizeRouteEstimate(routeEstimate) {

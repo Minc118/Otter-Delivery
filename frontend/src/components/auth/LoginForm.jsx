@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { login } from "../../services/profileService.js";
+import {
+  isProfileServiceUnavailable,
+  login,
+} from "../../services/profileService.js";
 import Button from "../ui/Button.jsx";
 
 export default function LoginForm() {
@@ -19,7 +22,11 @@ export default function LoginForm() {
 
       navigate("/");
     } catch (error) {
-      setError("Profile not found");
+      setError(
+        isProfileServiceUnavailable(error)
+          ? "Profile service is currently unavailable"
+          : "Profile not found",
+      );
     }
   }
 
