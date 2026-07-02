@@ -5,8 +5,13 @@ import {
   getFallbackRestaurantViewModel,
 } from "./restaurantAdapter.js";
 
+
 const RESTAURANT_SERVICE_BASE_URL =
-  import.meta.env.VITE_RESTAURANT_SERVICE_URL ?? "http://localhost:8001";
+    import.meta.env.VITE_RESTAURANT_SERVICE_URL ?? "http://localhost:8001";
+
+const TRANSLATION_API =
+    import.meta.env.VITE_TRANSLATION_SERVICE_URL ?? "http://localhost:8005";
+
 
 const RESTAURANT_API = `${RESTAURANT_SERVICE_BASE_URL}/api/restaurants`;
 const FOOD_ITEMS_API = `${RESTAURANT_SERVICE_BASE_URL}/api/food-items`;
@@ -33,9 +38,12 @@ export async function getRestaurantById(id) {
   return adaptRestaurant(restaurant);
 }
 
-export async function getFoodItemsByRestaurantId(restaurantId, restaurant = null) {
+export async function getFoodItemsByRestaurantId(
+    restaurantId,
+    restaurant = null
+) {
   const response = await fetch(
-    `${FOOD_ITEMS_API}/restaurants/${restaurantId}`,
+      `${FOOD_ITEMS_API}/restaurants/${restaurantId}`
   );
 
   if (!response.ok) {
@@ -48,4 +56,35 @@ export async function getFoodItemsByRestaurantId(restaurantId, restaurant = null
 
 export function getFallbackRestaurant() {
   return getFallbackRestaurantViewModel();
+}
+
+
+// =======================================
+// TRANSLATION SERVICE (FASTAPI)
+// =======================================
+
+export async function getTranslatedRestaurants(lang) {
+  const response = await fetch(
+      `${TRANSLATION_API}/api/translations/restaurants?lang=${lang}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to translate restaurants");
+  }
+
+  const data = await response.json();
+
+  return adaptRestaurants(data);
+}
+
+export async function getTranslatedFoodItemsByRestaurantId(id, lang) {
+  const response = await fetch(
+      `${TRANSLATION_API}/api/translations/restaurants/${id}/food-items?lang=${lang}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to translate food items");
+  }
+
+  return await response.json();
 }

@@ -1,20 +1,38 @@
 import { useEffect, useState } from "react";
 import FilterBar from "../components/discovery/FilterBar.jsx";
 import RestaurantGrid from "../components/restaurant/RestaurantGrid.jsx";
-import { getRestaurants } from "../services/catalogService.js";
+import {
+  getRestaurants,
+  getTranslatedRestaurants,
+} from "../services/catalogService.js";
 
 export default function RestaurantDiscoveryPage() {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [language, setLanguage] = useState(
+      localStorage.getItem("lang") || "EN"
+  );
 
   useEffect(() => {
     document.title = "Restaurant Discovery - Otter Delivery";
+  }, []);
 
+  useEffect(() => {
     async function loadRestaurants() {
       try {
-        const data = await getRestaurants();
+        setLoading(true);
+
+        let data;
+
+        if (language === "EN") {
+          data = await getRestaurants();
+        } else {
+          data = await getTranslatedRestaurants(language);
+        }
+
         setRestaurants(data);
+        setError(null);
       } catch (err) {
         setError("Restaurants could not be loaded.");
       } finally {
@@ -23,6 +41,18 @@ export default function RestaurantDiscoveryPage() {
     }
 
     loadRestaurants();
+  }, [language]);
+
+  useEffect(() => {
+    function handleLanguageChange(e) {
+      setLanguage(e.detail);
+    }
+
+    window.addEventListener("language-change", handleLanguageChange);
+
+    return () => {
+      window.removeEventListener("language-change", handleLanguageChange);
+    };
   }, []);
 
   return (
