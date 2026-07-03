@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import java.util.List;
 
 
@@ -19,9 +20,16 @@ import java.util.List;
 public class TranslationClient {
 
     private final WebClient webClient;
-
-    public TranslationClient(@Qualifier("deeplWebClient") WebClient webClient){
-        this.webClient=webClient;
+    private final Cache translationCache;
+    public TranslationClient(
+            @Qualifier("deeplWebClient") WebClient webClient,
+            CacheManager cacheManager
+    ) {
+        this.webClient = webClient;
+        this.translationCache = cacheManager.getCache("translations");
+    }
+    private String buildKey(List<String> texts, String lang) {
+        return lang + "::" + String.join("|", texts);
     }
 
     @Value("${deepl.api-key}")
@@ -30,8 +38,6 @@ public class TranslationClient {
     @Value("${deepl.base-url}")
     private String baseUrl;
 
-    //@Cacheable(cacheNames = "translations", key = "#targetLang + '::' + #text")
-    //@Cacheable(cacheNames = "translations", key = "#text + '::' + #targetLang")
     public Mono<String> translate(String text, String target_lang) {
         if (text == null || text.isBlank() || target_lang == null || target_lang.isBlank()) {
             return Mono.just(text);
@@ -64,22 +70,33 @@ public class TranslationClient {
                     return Mono.just(text); // fallback to original text on error
                 });
     }
+
     public Mono<List<String>> translateBatch(List<String> texts, String targetLang) {
 
         if (texts == null || texts.isEmpty() || targetLang == null || targetLang.isBlank()) {
             return Mono.just(List.of());
         }
 
-        log.info("Batch translating {} texts -> [{}]", texts.size(), targetLang);
+        String key = buildKey(texts, targetLang);
 
-        BodyInserters.FormInserter<String> form = BodyInserters.fromFormData("target_lang", targetLang);
+        Cache.ValueWrapper cached = translationCache != null ? translationCache.get(key) : null;
+
+        if (cached != null) {
+            log.info("🟢 CACHE HIT (batch) -> {}", key);
+            return Mono.just((List<String>) cached.get());
+        }
+
+        log.info("🔵 CACHE MISS (batch) -> {}", key);
+
+        BodyInserters.FormInserter<String> form =
+                BodyInserters.fromFormData("target_lang", targetLang);
 
         for (String text : texts) {
             form = form.with("text", text);
         }
 
         return webClient.post()
-                .uri("") // or baseUrl if configured properly in WebClient bean
+                .uri("")
                 .header("Authorization", "DeepL-Auth-Key " + apiKey)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(form)
@@ -87,7 +104,7 @@ public class TranslationClient {
                 .bodyToMono(TranslationResponse.class)
                 .map(response -> {
                     if (response == null || response.translations() == null) {
-                        return texts; // fallback: return original order
+                        return texts;
                     }
 
                     return response.translations()
@@ -95,11 +112,14 @@ public class TranslationClient {
                             .map(TranslationResult::text)
                             .toList();
                 })
+                .doOnNext(result -> {
+                    if (translationCache != null) {
+                        translationCache.put(key, result);
+                    }
+                })
                 .onErrorResume(e -> {
-                    log.warn("Batch translation failed for {} texts to {}: {}",
-                            texts.size(), targetLang, e.getMessage());
-
-                    return Mono.just(texts); // fallback
+                    log.warn("Batch translation failed: {}", e.getMessage());
+                    return Mono.just(texts);
                 });
     }
 
