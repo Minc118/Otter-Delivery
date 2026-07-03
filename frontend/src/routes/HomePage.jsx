@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import AIFoodSearch from "../components/home/AIFoodSearch.jsx";
 import RecommendationSection from "../components/home/RecommendationSection.jsx";
+import { getRestaurants } from "../services/catalogService.js";
 import {
-  getRecommendations,
+  getHomepageRestaurantRecommendations,
   searchRecommendations,
   searchLiveRestaurantRecommendations,
 } from "../services/recommendationService.js";
@@ -10,13 +11,60 @@ import {
 export default function HomePage() {
   const [activeQuery, setActiveQuery] = useState("");
   const [error, setError] = useState(null);
-  const [recommendationSource, setRecommendationSource] = useState("mock");
-  const [recommendations, setRecommendations] = useState(getRecommendations());
-  const [status, setStatus] = useState("idle");
+  const [recommendationSource, setRecommendationSource] = useState("restaurant-service");
+  const [recommendations, setRecommendations] = useState([]);
+  const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     document.title = "Otter Delivery - AI-Powered Food Discovery";
   }, []);
+
+  useEffect(() => {
+    loadHomepageRecommendations();
+  }, []);
+
+  async function loadHomepageRecommendations() {
+    setStatus("loading");
+    setError(null);
+    setRecommendationSource("restaurant-service");
+
+    try {
+      const restaurants = await getRestaurants();
+      const restaurantRecommendations =
+        getHomepageRestaurantRecommendations(restaurants);
+      const liveRestaurantIds = new Set(
+        restaurants.map((restaurant) => String(restaurant.restaurantId ?? restaurant.id)),
+      );
+
+      try {
+        const ranked = await searchLiveRestaurantRecommendations();
+        const rankedRecommendations = ranked.recommendations.filter((recommendation) =>
+          liveRestaurantIds.has(String(recommendation.restaurant.id)),
+        );
+        const rankedIds = new Set(
+          rankedRecommendations.map((recommendation) => String(recommendation.restaurant.id)),
+        );
+        const fillRecommendations = restaurantRecommendations.filter(
+          (recommendation) => !rankedIds.has(String(recommendation.restaurant.id)),
+        );
+        const homepageRecommendations = [
+          ...rankedRecommendations,
+          ...fillRecommendations,
+        ].slice(0, 3);
+
+        setRecommendations(homepageRecommendations);
+        setRecommendationSource(ranked.source);
+        setStatus(homepageRecommendations.length > 0 ? "success" : "empty");
+      } catch {
+        setRecommendations(restaurantRecommendations);
+        setStatus(restaurantRecommendations.length > 0 ? "success" : "empty");
+      }
+    } catch {
+      setRecommendations([]);
+      setError("Restaurant Service is unavailable. Today's recommendations could not be loaded.");
+      setStatus("unavailable");
+    }
+  }
 
   async function handleSearch(query) {
     const trimmedQuery = query.trim();
@@ -25,9 +73,7 @@ export default function HomePage() {
     setError(null);
 
     if (!trimmedQuery) {
-      setStatus("idle");
-      setRecommendationSource("mock");
-      setRecommendations(getRecommendations());
+      await loadHomepageRecommendations();
       return;
     }
 

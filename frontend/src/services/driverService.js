@@ -1,5 +1,7 @@
 const DRIVER_API_BASE_URL =
-  import.meta.env.VITE_DRIVER_API_URL ?? "http://localhost:8003";
+  import.meta.env.VITE_DRIVER_SERVICE_URL ??
+  import.meta.env.VITE_DRIVER_API_URL ??
+  "http://localhost:8003";
 
 async function requestDriverService(path, options = {}) {
   const response = await fetch(`${DRIVER_API_BASE_URL}${path}`, {

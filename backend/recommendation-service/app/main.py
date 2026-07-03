@@ -12,6 +12,10 @@ from app.routes.recommendations import router as recommendations_router
 
 settings = get_settings()
 
+VERCEL_PREVIEW_ORIGIN_REGEX = r"https://.*\.vercel\.app"
+FRONTEND_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+FRONTEND_CORS_HEADERS = ["Content-Type", "Authorization", "Accept", "Origin"]
+
 app = FastAPI(
     title="Otter Delivery LLM Recommendation Service",
     version="0.2.0",
@@ -20,9 +24,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.frontend_cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origin_regex=VERCEL_PREVIEW_ORIGIN_REGEX,
+    allow_credentials=False,
+    allow_methods=FRONTEND_CORS_METHODS,
+    allow_headers=FRONTEND_CORS_HEADERS,
 )
 
 

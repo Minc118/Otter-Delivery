@@ -29,14 +29,11 @@ export default function FilterBar() {
           {filterGroups.map((group) => (
             <label className="relative" key={group.label}>
               <span className="sr-only">{group.label}</span>
-              <select className="appearance-none bg-surface-container-low border border-surface-variant text-on-surface font-metadata text-metadata rounded-lg pl-4 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer">
+              <select className="otter-select bg-surface-container-low border border-surface-variant text-on-surface font-metadata text-metadata rounded-lg pl-4 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer">
                 {group.options.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant text-[20px]">
-                expand_more
-              </span>
             </label>
           ))}
         </div>
@@ -47,14 +44,11 @@ export default function FilterBar() {
           </span>
           <label className="relative">
             <span className="sr-only">Sort restaurants</span>
-            <select className="appearance-none bg-transparent font-button text-button text-primary border-none focus:ring-0 cursor-pointer pr-6 font-semibold">
+            <select className="otter-select otter-select-primary bg-transparent font-button text-button text-primary border-none focus:ring-0 cursor-pointer pr-6 font-semibold">
               <option>Recommended</option>
               <option>Rating (High to Low)</option>
               <option>Delivery Time</option>
             </select>
-            <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-primary text-[20px]">
-              sort
-            </span>
           </label>
         </div>
       </div>
