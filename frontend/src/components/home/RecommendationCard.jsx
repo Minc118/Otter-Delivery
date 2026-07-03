@@ -4,9 +4,15 @@ export default function RecommendationCard({ recommendation }) {
   const image = recommendation.image ?? { alt: recommendation.title, src: "" };
   const badge = recommendation.badge ?? { icon: "auto_awesome", label: "AI Pick" };
   const tags = recommendation.tags ?? [];
+  const restaurantPath = `/restaurants/${recommendation.restaurant.id}`;
+  const subtitle = recommendation.subtitle ?? `from ${recommendation.restaurant.name}`;
 
   return (
-    <article className="bg-surface-light rounded-xl overflow-hidden border border-surface flex flex-col hover:ai-shadow hover:border-primary-light transition-all duration-300">
+    <Link
+      aria-label={`View ${recommendation.title}`}
+      className="bg-surface-light rounded-xl overflow-hidden border border-surface flex flex-col hover:ai-shadow hover:border-primary-light transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-container"
+      to={restaurantPath}
+    >
       <div className="h-48 relative">
         <img
           alt={image.alt}
@@ -30,7 +36,7 @@ export default function RecommendationCard({ recommendation }) {
           </span>
         </div>
         <p className="font-metadata text-metadata text-on-surface-variant mb-4">
-          from {recommendation.restaurant.name}
+          {subtitle}
         </p>
         <div className="bg-surface-container-lowest p-3 rounded-lg border border-surface mb-4 flex-grow">
           <p className="font-body-md text-body-md text-dark-text italic text-sm">
@@ -47,13 +53,12 @@ export default function RecommendationCard({ recommendation }) {
             </span>
           ))}
         </div>
-        <Link
+        <span
           className="w-full py-3 border border-primary-container text-primary-container rounded-lg font-button text-button hover:bg-surface transition-colors text-center"
-          to={`/restaurants/${recommendation.restaurant.id}`}
         >
           View restaurant
-        </Link>
+        </span>
       </div>
-    </article>
+    </Link>
   );
 }

@@ -93,6 +93,28 @@ class MultilingualRecommendationTests(unittest.TestCase):
         self.assertTrue(result.recommendations[0].reason.startswith("符合你的需求："))
         self.assertIn("辣味", result.recommendations[0].reason)
 
+    def test_restaurant_preferences_accept_max_price_alias(self) -> None:
+        result = self.service.create_restaurant_recommendations(
+            RestaurantRecommendationRequest(
+                user_id="preference-test-user",
+                preferences={"maxPrice": 12},
+            )
+        )
+
+        self.assertEqual(result.recommendations[0].restaurant_id, "spicy-veg")
+        self.assertIn("within 12.00 max", result.recommendations[0].matched_factors)
+
+    def test_disliked_ingredients_reduce_risky_matches(self) -> None:
+        result = self.service.create_restaurant_recommendations(
+            RestaurantRecommendationRequest(
+                user_id="preference-test-user",
+                preferences={"dislikedIngredients": ["tofu"]},
+            )
+        )
+
+        self.assertEqual(result.recommendations[0].restaurant_id, "burger")
+        self.assertIn("contains disliked tofu", result.recommendations[1].negative_factors)
+
     def _recommend(self, query: str):
         return self.service.create_restaurant_recommendations(
             RestaurantRecommendationRequest(

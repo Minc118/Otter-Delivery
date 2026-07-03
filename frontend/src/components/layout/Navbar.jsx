@@ -112,12 +112,6 @@ export default function Navbar({
             >
               Restaurants
             </NavLink>
-            <NavLink
-              className={navLinkClass}
-              to="/rankings"
-            >
-              Rankings
-            </NavLink>
           </nav>
         </div>
         <div className="flex items-center gap-4">

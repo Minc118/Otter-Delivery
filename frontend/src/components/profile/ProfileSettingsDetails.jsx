@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import {
@@ -6,7 +6,6 @@ import {
     updateProfile,
 } from "../../services/profileService.js";
 import {
-    getUserPreferences,
     updateUserPreferences,
 } from "../../services/recommendationService.js";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +30,7 @@ const sectionCopy = {
 
 export default function ProfileSettingsDetails({
   activeSection,
+  onUserUpdate,
   settings,
   user,
 }) {
@@ -80,7 +80,7 @@ export default function ProfileSettingsDetails({
       ) : null}
 
         {activeSection === "preferences" ? (
-            <FoodPreferencesSettings user={user} />
+            <FoodPreferencesSettings onUserUpdate={onUserUpdate} user={user} />
         ) : null}
 
       {activeSection === "notifications" ? (
@@ -91,7 +91,7 @@ export default function ProfileSettingsDetails({
       ) : null}
 
         {activeSection === "account" ? (
-            <AccountSettings user={user} />
+            <AccountSettings onUserUpdate={onUserUpdate} user={user} />
         ) : null}    </Card>
   );
 }
@@ -264,7 +264,7 @@ function NotificationSettings({ notifications, onNotificationsChange }) {
   );
 }
 
-function AccountSettings({ user }) {
+function AccountSettings({ onUserUpdate, user }) {
     const navigate = useNavigate();
 
     function handleLogout() {
@@ -309,6 +309,7 @@ function AccountSettings({ user }) {
             });
 
             localStorage.setItem("profile", JSON.stringify(updatedProfile));
+            onUserUpdate?.(updatedProfile);
             setMessage("Profile updated successfully.");
         } catch (error) {
             setMessage(
@@ -414,17 +415,39 @@ function AccountSettings({ user }) {
     );
 }
 
-function FoodPreferencesSettings({ user }) {
+function FoodPreferencesSettings({ onUserUpdate, user }) {
     const cuisineOptions = ["Italian", "Korean", "Japanese", "Mexican", "Indian", "Turkish"];
     const dietaryOptions = ["Vegetarian", "Vegan", "Halal", "Gluten-free", "Healthy", "Spicy"];
 
-    const [favoriteCuisines, setFavoriteCuisines] = useState([]);
-    const [dietaryPreferences, setDietaryPreferences] = useState([]);
-    const [allergens, setAllergens] = useState("");
-    const [dislikedIngredients, setDislikedIngredients] = useState("");
-    const [maxPrice, setMaxPrice] = useState("");
+    const [favoriteCuisines, setFavoriteCuisines] = useState(() =>
+        normalizePreferenceLabels(user.favoriteCuisines, cuisineOptions),
+    );
+    const [dietaryPreferences, setDietaryPreferences] = useState(() =>
+        normalizePreferenceLabels(user.dietaryPreferences, dietaryOptions),
+    );
+    const [allergens, setAllergens] = useState(() => preferenceText(user.allergies));
+    const [dislikedIngredients, setDislikedIngredients] = useState(() =>
+        preferenceText(user.dislikedIngredients),
+    );
+    const [maxPrice, setMaxPrice] = useState(() =>
+        user.maximumPrice === null || user.maximumPrice === undefined
+            ? ""
+            : String(user.maximumPrice),
+    );
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
+
+    useEffect(() => {
+        setFavoriteCuisines(normalizePreferenceLabels(user.favoriteCuisines, cuisineOptions));
+        setDietaryPreferences(normalizePreferenceLabels(user.dietaryPreferences, dietaryOptions));
+        setAllergens(preferenceText(user.allergies));
+        setDislikedIngredients(preferenceText(user.dislikedIngredients));
+        setMaxPrice(
+            user.maximumPrice === null || user.maximumPrice === undefined
+                ? ""
+                : String(user.maximumPrice),
+        );
+    }, [user.id]);
 
     function toggleValue(value, setter) {
         setter((current) =>
@@ -439,25 +462,34 @@ function FoodPreferencesSettings({ user }) {
         setMessage("");
 
         try {
-            await updateUserPreferences(String(user.id), {
+            const updatedProfile = await updateProfile(user.id, {
+                ...user,
+                favoriteCuisines,
+                dietaryPreferences,
+                allergies: splitPreferenceText(allergens),
+                dislikedIngredients: splitPreferenceText(dislikedIngredients),
+                maximumPrice: maxPrice ? Number(maxPrice) : null,
+            });
+
+            localStorage.setItem("profile", JSON.stringify(updatedProfile));
+            onUserUpdate?.(updatedProfile);
+
+            try {
+                await updateUserPreferences(String(user.id), {
                 language: "en",
                 cuisinePreferences: favoriteCuisines.map((item) => item.toLowerCase()),
                 dietaryPreferences: dietaryPreferences.map((item) => item.toLowerCase()),
-                allergens: allergens
-                    .split(",")
-                    .map((item) => item.trim().toLowerCase())
-                    .filter(Boolean),
-                dislikedIngredients: dislikedIngredients
-                    .split(",")
-                    .map((item) => item.trim().toLowerCase())
-                    .filter(Boolean),
+                allergens: splitPreferenceText(allergens).map((item) => item.toLowerCase()),
+                dislikedIngredients: splitPreferenceText(dislikedIngredients).map((item) => item.toLowerCase()),
                 maxPrice: maxPrice ? Number(maxPrice) : null,
                 metadata: {},
             });
+            } catch {
+                // Profile-service is the durable source for the app; recommendation sync is best effort.
+            }
 
             setMessage("Preferences saved successfully.");
-        } catch (error) {
-            console.error(error);
+        } catch {
             setMessage("Could not save preferences.");
         } finally {
             setSaving(false);
@@ -523,6 +555,27 @@ function FoodPreferencesSettings({ user }) {
             </div>
         </div>
     );
+}
+
+function normalizePreferenceLabels(values, options) {
+    const normalizedValues = new Set(
+        (Array.isArray(values) ? values : [])
+            .map((value) => String(value).toLowerCase())
+            .filter(Boolean),
+    );
+
+    return options.filter((option) => normalizedValues.has(option.toLowerCase()));
+}
+
+function preferenceText(values) {
+    return Array.isArray(values) ? values.join(", ") : "";
+}
+
+function splitPreferenceText(value) {
+    return String(value ?? "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
 }
 
 function PreferenceGroup({ title, description, options, selected, onToggle }) {

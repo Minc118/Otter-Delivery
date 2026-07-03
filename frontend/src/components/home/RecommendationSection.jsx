@@ -11,6 +11,7 @@ export default function RecommendationSection({
   const isLoading = status === "loading";
   const isServiceUnavailable = status === "unavailable";
   const sourceLabel = source === "hybrid" ? "Gemini rerank + fallback scoring" : source;
+  const isHomepageCatalog = !activeQuery && source === "restaurant-service";
 
   return (
     <section
@@ -45,9 +46,13 @@ export default function RecommendationSection({
       </div>
       {isLoading ? (
         <EmptyState
-          description="Asking the Recommendation Service to score the live restaurant catalog."
+          description={
+            isHomepageCatalog
+              ? "Loading restaurants from the live catalog."
+              : "Asking the Recommendation Service to score the live restaurant catalog."
+          }
           icon="auto_awesome"
-          title="Finding live matches"
+          title={isHomepageCatalog ? "Loading today's restaurants" : "Finding live matches"}
         />
       ) : recommendations.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">

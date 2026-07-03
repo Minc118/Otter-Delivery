@@ -13,6 +13,16 @@ from app.routes.drivers import router as drivers_router
 from app.routes.health import router as health_router
 from app.routes.tracking import router as tracking_router
 
+FRONTEND_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "https://otter-delivery.vercel.app",
+]
+VERCEL_PREVIEW_ORIGIN_REGEX = r"https://.*\.vercel\.app"
+FRONTEND_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+FRONTEND_CORS_HEADERS = ["Content-Type", "Authorization", "Accept", "Origin"]
+
 
 def create_app(
     repository: DriverRepository | None = None,
@@ -26,10 +36,11 @@ def create_app(
     application.state.settings = active_settings
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_origins=FRONTEND_CORS_ORIGINS,
+        allow_origin_regex=VERCEL_PREVIEW_ORIGIN_REGEX,
+        allow_credentials=False,
+        allow_methods=FRONTEND_CORS_METHODS,
+        allow_headers=FRONTEND_CORS_HEADERS,
     )
 
     @application.exception_handler(ServiceError)

@@ -13,6 +13,11 @@ QUERY_SYNONYMS = {
     "vegan": {"vegan", "plant"},
     "healthy": {"healthy", "fresh", "salad", "bowl"},
     "asian": {"asian", "thai", "japanese", "korean", "chinese", "sushi", "ramen", "noodles", "curry"},
+    "indian": {"indian", "curry", "masala", "dal"},
+    "italian": {"italian", "pizza", "pasta", "margherita"},
+    "japanese": {"japanese", "sushi", "ramen", "noodles"},
+    "korean": {"korean", "kimchi", "bibimbap", "tteokbokki"},
+    "mexican": {"mexican", "taco", "burrito", "quesadilla"},
     "turkish": {"turkish", "kebab", "doner", "döner"},
     "pizza": {"pizza", "italian", "margherita"},
     "burger": {"burger", "burgers", "american", "smash"},
@@ -121,12 +126,18 @@ def score_restaurants(
 ) -> list[ScoredCandidate]:
     history_by_restaurant = history_by_restaurant or {}
     query_tokens = _expand_tokens(_tokens(query or ""))
-    dietary = _lower_list(preferences.get("dietary") or preferences.get("dietary_preferences"))
-    allergies = _lower_list(preferences.get("allergies") or preferences.get("allergens"))
-    favorite_cuisines = _lower_list(
-        preferences.get("favorite_cuisines") or preferences.get("cuisine_preferences")
+    dietary = _lower_list(_first_present(preferences, "dietary", "dietary_preferences", "dietaryPreferences"))
+    allergies = _lower_list(_first_present(preferences, "allergies", "allergens"))
+    disliked_ingredients = _lower_list(
+        _first_present(preferences, "disliked_ingredients", "dislikedIngredients")
     )
-    price_range = _normalize_price_range(preferences.get("price_range") or preferences.get("priceRange"))
+    favorite_cuisines = _lower_list(
+        _first_present(preferences, "favorite_cuisines", "favoriteCuisines", "cuisine_preferences", "cuisinePreferences")
+    )
+    price_range = _normalize_price_range(_first_present(preferences, "price_range", "priceRange"))
+    max_price = _normalize_max_price(
+        _first_present(preferences, "max_price", "maxPrice", "maximum_price", "maximumPrice")
+    )
     feedback_by_restaurant = feedback_by_restaurant or {}
 
     candidates: list[ScoredCandidate] = []
@@ -146,6 +157,7 @@ def score_restaurants(
                 dietary=dietary,
                 favorite_cuisines=favorite_cuisines,
                 price_range=price_range,
+                max_price=max_price,
             )
             for item in available_items
         ]
@@ -183,6 +195,19 @@ def score_restaurants(
         matched_factors.extend(price_matches)
         negative_factors.extend(price_negatives)
 
+        max_price_score, max_price_matches, max_price_negatives = _max_price_score(max_price, available_items)
+        score += max_price_score
+        matched_factors.extend(max_price_matches)
+        negative_factors.extend(max_price_negatives)
+
+        disliked_score, disliked_matches, disliked_negatives = _disliked_ingredient_score(
+            disliked_ingredients,
+            reliable_terms,
+        )
+        score += disliked_score
+        matched_factors.extend(disliked_matches)
+        negative_factors.extend(disliked_negatives)
+
         query_score, query_matches, query_negatives = _query_score(query_tokens, reliable_terms)
         score += query_score
         matched_factors.extend(query_matches)
@@ -216,7 +241,10 @@ def score_restaurants(
             "query_keywords": sorted(query_tokens),
             "dietary_preferences": sorted(dietary),
             "price_preference": price_range,
+            "max_price": max_price,
             "cuisine_preference": sorted(favorite_cuisines),
+            "allergies": sorted(allergies),
+            "disliked_ingredients": sorted(disliked_ingredients),
             "candidate_category": restaurant.cuisine or (restaurant.tags[0] if restaurant.tags else None),
             "candidate_price_range": candidate_price_range,
             "candidate_restaurant_id": restaurant.restaurant_id,
@@ -262,6 +290,7 @@ def _score_item(
     dietary: set[str],
     favorite_cuisines: set[str],
     price_range: str | None,
+    max_price: float | None,
 ) -> tuple[float, FoodItem, list[str], list[str]]:
     restaurant_terms = _restaurant_terms(restaurant)
     item_terms = _item_terms(item)
@@ -287,6 +316,11 @@ def _score_item(
         score += max(min(price_score, 4), -4)
         matched.extend(price_matched)
         negative.extend(price_negative)
+    if max_price is not None and item.price is not None:
+        max_price_score, max_price_matched, max_price_negative = _max_price_score(max_price, [item])
+        score += max(min(max_price_score, 5), -8)
+        matched.extend(max_price_matched)
+        negative.extend(max_price_negative)
 
     return score, item, matched, negative
 
@@ -331,6 +365,33 @@ def _price_score(price_range: str | None, items: list[FoodItem]) -> tuple[int, l
     if average < low or average <= high + 5:
         return 5, [f"close to {price_range} price"], []
     return -20, [], ["too expensive"]
+
+
+def _max_price_score(max_price: float | None, items: list[FoodItem]) -> tuple[int, list[str], list[str]]:
+    if max_price is None or not items:
+        return 0, [], []
+    prices = [item.price for item in items if item.price is not None]
+    if not prices:
+        return 0, [], ["price unknown"]
+    average = sum(prices) / len(prices)
+    cheapest = min(prices)
+    if average <= max_price:
+        return 15, [f"within {max_price:.2f} max"], []
+    if cheapest <= max_price:
+        return 6, [f"has options under {max_price:.2f}"], []
+    return -25, [], [f"above {max_price:.2f} max"]
+
+
+def _disliked_ingredient_score(
+    disliked_ingredients: set[str],
+    terms: set[str],
+) -> tuple[int, list[str], list[str]]:
+    if not disliked_ingredients:
+        return 0, [], []
+    matched = disliked_ingredients.intersection(terms)
+    if matched:
+        return -25, [], [f"contains disliked {item}" for item in sorted(matched)[:3]]
+    return 0, [], []
 
 
 def _candidate_price_range(items: list[FoodItem]) -> str | None:
@@ -421,11 +482,28 @@ def _lower_list(value: Any) -> set[str]:
     return set()
 
 
+def _first_present(values: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in values and values[key] not in (None, [], {}):
+            return values[key]
+    return None
+
+
 def _normalize_price_range(value: Any) -> str | None:
     if value is None:
         return None
     normalized = str(value).lower().strip()
     return normalized or None
+
+
+def _normalize_max_price(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
 
 
 def _unique(values: list[str]) -> list[str]:

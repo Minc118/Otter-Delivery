@@ -31,6 +31,12 @@ export function getRecommendations() {
   return recommendations.slice(0, HOMEPAGE_RECOMMENDATION_LIMIT);
 }
 
+export function getHomepageRestaurantRecommendations(restaurants = []) {
+  return restaurants
+    .slice(0, HOMEPAGE_RECOMMENDATION_LIMIT)
+    .map((restaurant, index) => toRestaurantRecommendationCardModel(restaurant, index));
+}
+
 export function searchRecommendations(query) {
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -90,12 +96,13 @@ export async function getRestaurantRecommendations(payload) {
 }
 
 export async function searchLiveRestaurantRecommendations(query) {
-  const profile = JSON.parse(localStorage.getItem("profile"));
+  const profile = getStoredProfile();
+  const preferences = getProfileRecommendationPreferences(profile);
 
   const data = await getRestaurantRecommendations({
-    userId: String(profile.id),
-    query,
-    preferences: {},
+    userId: profile?.id ? String(profile.id) : "guest",
+    query: query?.trim() || undefined,
+    preferences,
   });
 
   return {
@@ -103,6 +110,32 @@ export async function searchLiveRestaurantRecommendations(query) {
       .slice(0, HOMEPAGE_RECOMMENDATION_LIMIT)
       .map((item, index) => toRecommendationCardModel(item, index)),
     source: data.source ?? "fallback",
+  };
+}
+
+function toRestaurantRecommendationCardModel(restaurant, index) {
+  const cuisine = restaurant.cuisine ?? "Local favorite";
+  const title = restaurant.name;
+  const firstTag = restaurant.tags?.[0] ?? cuisine;
+
+  return {
+    id: `restaurant-${restaurant.id}`,
+    title,
+    price: restaurant.priceTier ?? restaurant.eta ?? "Live",
+    restaurant: {
+      id: restaurant.restaurantId ?? restaurant.id,
+      name: restaurant.name,
+    },
+    subtitle: cuisine,
+    badge: {
+      icon: index === 0 ? "auto_awesome" : "restaurant",
+      label: index === 0 ? "Today's Pick" : "Live Restaurant",
+    },
+    image: restaurant.image,
+    reason: `Open from the live restaurant catalog. ${firstTag} is available for today's demo flow.`,
+    tags: [restaurant.rating ? `${restaurant.rating} rating` : null, restaurant.eta, cuisine]
+      .filter(Boolean)
+      .slice(0, 3),
   };
 }
 
@@ -133,6 +166,58 @@ function toRecommendationCardModel(item, index) {
     reason: item.reason ?? "Matched against the live restaurant catalog.",
     tags: matchedFactors.slice(0, 4),
   };
+}
+
+function getStoredProfile() {
+  try {
+    return JSON.parse(localStorage.getItem("profile"));
+  } catch {
+    return null;
+  }
+}
+
+export function getProfileRecommendationPreferences(profile = getStoredProfile()) {
+  if (!profile) {
+    return {};
+  }
+
+  const favoriteCuisines = normalizeList(profile.favoriteCuisines);
+  const dietaryPreferences = normalizeList(profile.dietaryPreferences);
+  const allergies = normalizeList(profile.allergies);
+  const dislikedIngredients = normalizeList(profile.dislikedIngredients);
+  const maximumPrice = normalizeNumber(profile.maximumPrice);
+
+  return {
+    favoriteCuisines,
+    cuisinePreferences: favoriteCuisines,
+    dietaryPreferences,
+    allergies,
+    allergens: allergies,
+    dislikedIngredients,
+    maximumPrice,
+    maxPrice: maximumPrice,
+  };
+}
+
+function normalizeList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function pickRecommendationImage(seed) {

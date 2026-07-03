@@ -30,9 +30,15 @@ class UserPreferencePayload(ApiModel):
 
 class RestaurantPreferencePayload(ApiModel):
     dietary: list[str] = Field(default_factory=list)
+    dietary_preferences: list[str] = Field(default_factory=list)
     price_range: str | None = None
     favorite_cuisines: list[str] = Field(default_factory=list)
+    cuisine_preferences: list[str] = Field(default_factory=list)
     allergies: list[str] = Field(default_factory=list)
+    allergens: list[str] = Field(default_factory=list)
+    disliked_ingredients: list[str] = Field(default_factory=list)
+    max_price: float | None = Field(default=None, ge=0)
+    maximum_price: float | None = Field(default=None, ge=0)
 
 
 class PreferenceUpsertRequest(UserPreferencePayload):

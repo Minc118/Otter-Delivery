@@ -49,6 +49,11 @@ public class ProfileService {
             profile.setStreet(newProfileData.getStreet());
             profile.setCity(newProfileData.getCity());
             profile.setPostalCode(newProfileData.getPostalCode());
+            profile.setFavoriteCuisines(newProfileData.getFavoriteCuisines());
+            profile.setDietaryPreferences(newProfileData.getDietaryPreferences());
+            profile.setAllergies(newProfileData.getAllergies());
+            profile.setDislikedIngredients(newProfileData.getDislikedIngredients());
+            profile.setMaximumPrice(newProfileData.getMaximumPrice());
             return profileRepository.save(profile);
         });
     }

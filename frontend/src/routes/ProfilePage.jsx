@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import PageShell from "../components/layout/PageShell.jsx";
 import {
+  getProfile,
   getOrders,
   isProfileServiceUnavailable,
 } from "../services/profileService.js";
@@ -55,11 +56,21 @@ export default function ProfilePage() {
         return;
       }
 
+      let activeProfile = storedProfile;
       setProfile(storedProfile);
+
+      try {
+        activeProfile = await getProfile(storedProfile.id);
+        localStorage.setItem("profile", JSON.stringify(activeProfile));
+        setProfile(activeProfile);
+      } catch {
+        activeProfile = storedProfile;
+      }
+
       let loadedOrders = [];
 
       try {
-        loadedOrders = await getOrders(storedProfile.id);
+        loadedOrders = await getOrders(activeProfile.id);
         setOrders(loadedOrders);
       } catch (error) {
         setProfileError(
@@ -165,6 +176,7 @@ export default function ProfilePage() {
 
               <ProfileSettingsDetails
                   activeSection={activeSettingsSection}
+                  onUserUpdate={(updatedProfile) => setProfile(updatedProfile)}
                   settings={profileSettings}
                   user={profileUser}
               />
