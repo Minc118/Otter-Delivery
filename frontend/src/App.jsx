@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import CartDrawer from "./components/cart/CartDrawer.jsx";
 import Footer from "./components/layout/Footer.jsx";
 import Navbar from "./components/layout/Navbar.jsx";
@@ -35,6 +35,7 @@ function AppLayout() {
     trackedOrders,
   } = useCart();
   const isTransactionalRoute = location.pathname === "/login";
+  const activeTrackingPath = getActiveTrackingPath(activeOrderId, trackedOrders);
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-container-lowest text-on-surface font-body-md">
@@ -53,10 +54,15 @@ function AppLayout() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/profile/orders" element={<OrderHistoryPage />} />
           <Route path="/profile/saved" element={<SavedRestaurantsPage />} />
           <Route path="/orders/confirm" element={<OrderConfirmationPage />} />
           <Route path="/orders/:id/success" element={<OrderSuccessPage />} />
+          <Route
+            path="/tracking"
+            element={<Navigate to={activeTrackingPath} replace />}
+          />
           <Route path="/restaurants" element={<RestaurantDiscoveryPage />} />
           <Route path="/rankings" element={<RankingPage />} />
           <Route path="/restaurants/:id" element={<RestaurantDetailPage />} />
@@ -72,4 +78,13 @@ function AppLayout() {
       )}
     </div>
   );
+}
+
+function getActiveTrackingPath(activeOrderId, trackedOrders) {
+  const activeOrder = trackedOrders.find(
+    (order) => String(order.id) === String(activeOrderId),
+  );
+  const trackingOrderId = activeOrder?.id ?? trackedOrders[0]?.id;
+
+  return trackingOrderId ? `/orders/${trackingOrderId}/tracking` : "/orders";
 }
