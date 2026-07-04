@@ -183,7 +183,7 @@ class RecommendationService:
         if any(candidate.source == "gemini" for candidate in final_candidates):
             source = "hybrid"
 
-        public_candidates = final_candidates[:5]
+        public_candidates = final_candidates[:6]
         if catalog_fallback and source == "fallback":
             source = "fallback"
 

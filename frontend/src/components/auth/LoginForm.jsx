@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   isProfileServiceUnavailable,
   login,
@@ -11,6 +11,8 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = getSafeReturnPath(searchParams.get("returnTo"));
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -26,7 +28,7 @@ export default function LoginForm() {
 
       localStorage.setItem("profile", JSON.stringify(profile));
 
-      navigate("/");
+      navigate(returnTo ?? "/");
     } catch (error) {
       setError(
         isProfileServiceUnavailable(error)
@@ -108,4 +110,12 @@ export default function LoginForm() {
         </div>
       </div>
   );
+}
+
+function getSafeReturnPath(path) {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return null;
+  }
+
+  return path;
 }

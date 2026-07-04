@@ -47,6 +47,46 @@ class StaticRestaurantClient:
         ]
 
 
+class RamenAndHalalRestaurantClient:
+    used_fallback = False
+
+    def fetch_catalog(self) -> list[Restaurant]:
+        return [
+            Restaurant(
+                restaurant_id="sakura-ramen",
+                name="Sakura Ramen Mitte",
+                cuisine="Japanese",
+                open=True,
+                tags=["japanese", "ramen", "noodles", "warm"],
+                food_items=[
+                    FoodItem(
+                        food_item_id="tan-tan-ramen",
+                        name="Vegan Tan Tan Ramen",
+                        description="Hot spicy ramen noodles with tofu, sesame broth, and chili oil.",
+                        price=13.9,
+                        tags=["ramen", "noodles", "spicy", "japanese"],
+                    )
+                ],
+            ),
+            Restaurant(
+                restaurant_id="anatolia-doner",
+                name="Anatolia Grill Kreuzberg",
+                cuisine="Turkish / Halal",
+                open=True,
+                tags=["turkish", "halal"],
+                food_items=[
+                    FoodItem(
+                        food_item_id="halal-doner",
+                        name="Halal Chicken Doner Plate",
+                        description="Halal chicken doner with rice, salad, garlic sauce, and warm flatbread.",
+                        price=13.9,
+                        tags=["halal", "turkish"],
+                    )
+                ],
+            ),
+        ]
+
+
 class MultilingualRecommendationTests(unittest.TestCase):
     def setUp(self) -> None:
         settings = Settings(
@@ -114,6 +154,27 @@ class MultilingualRecommendationTests(unittest.TestCase):
 
         self.assertEqual(result.recommendations[0].restaurant_id, "burger")
         self.assertIn("contains disliked tofu", result.recommendations[1].negative_factors)
+
+    def test_halal_profile_does_not_override_hot_ramen_query(self) -> None:
+        service = RecommendationService(
+            db=None,
+            settings=self.service.settings,
+            restaurant_client=RamenAndHalalRestaurantClient(),
+        )
+
+        result = service.create_restaurant_recommendations(
+            RestaurantRecommendationRequest(
+                user_id="halal-ramen-test-user",
+                query="hot ramen",
+                preferences={"dietaryPreferences": ["halal"]},
+            )
+        )
+
+        self.assertEqual(result.recommendations[0].restaurant_id, "sakura-ramen")
+        self.assertLess(
+            result.recommendations[1].recommendation_score,
+            result.recommendations[0].recommendation_score,
+        )
 
     def _recommend(self, query: str):
         return self.service.create_restaurant_recommendations(

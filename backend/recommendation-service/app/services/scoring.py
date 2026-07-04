@@ -9,6 +9,7 @@ from app.services.restaurant_client import FoodItem, Restaurant
 
 QUERY_SYNONYMS = {
     "spicy": {"spicy", "hot", "chili", "curry"},
+    "hot": {"hot", "spicy", "chili"},
     "vegetarian": {"vegetarian", "veggie", "tofu", "plant"},
     "vegan": {"vegan", "plant"},
     "healthy": {"healthy", "fresh", "salad", "bowl"},
@@ -27,6 +28,7 @@ QUERY_SYNONYMS = {
     "comfort": {"comfort", "comforting", "warm"},
     "comforting": {"comfort", "comforting", "warm"},
     "warm": {"warm", "comfort", "comforting"},
+    "ramen": {"ramen", "noodle", "noodles", "japanese", "warm"},
     "noodle": {"noodle", "noodles", "ramen"},
     "noodles": {"noodle", "noodles", "ramen"},
     "bowl": {"bowl", "bowls", "healthy"},
@@ -176,6 +178,11 @@ def score_restaurants(
             score -= 50
             negative_factors.append("closed")
 
+        query_score, query_matches, query_negatives = _query_score(query_tokens, reliable_terms)
+        score += query_score
+        matched_factors.extend(query_matches)
+        negative_factors.extend(query_negatives)
+
         cuisine_score, cuisine_matches, cuisine_negatives = _cuisine_score(
             restaurant,
             favorite_cuisines,
@@ -185,7 +192,11 @@ def score_restaurants(
         matched_factors.extend(cuisine_matches)
         negative_factors.extend(cuisine_negatives)
 
-        dietary_score, dietary_matches, dietary_negatives = _dietary_score(dietary, reliable_terms)
+        dietary_score, dietary_matches, dietary_negatives = _dietary_score(
+            dietary,
+            reliable_terms,
+            query_tokens,
+        )
         score += dietary_score
         matched_factors.extend(dietary_matches)
         negative_factors.extend(dietary_negatives)
@@ -207,11 +218,6 @@ def score_restaurants(
         score += disliked_score
         matched_factors.extend(disliked_matches)
         negative_factors.extend(disliked_negatives)
-
-        query_score, query_matches, query_negatives = _query_score(query_tokens, reliable_terms)
-        score += query_score
-        matched_factors.extend(query_matches)
-        negative_factors.extend(query_negatives)
 
         feedback_score, feedback_match, feedback_negative = _feedback_score(
             feedback_by_restaurant.get(restaurant.restaurant_id)
@@ -306,10 +312,10 @@ def _score_item(
     elif query_tokens.intersection(restaurant_terms):
         score += 3
     if dietary and dietary.intersection(terms):
-        score += 6
+        score += 5 if dietary.intersection(query_tokens) else 2
         matched.extend(sorted(dietary.intersection(terms)))
     if favorite_cuisines and favorite_cuisines.intersection(terms):
-        score += 4
+        score += 2
         matched.extend(sorted(favorite_cuisines.intersection(terms)))
     if price_range and item.price is not None:
         price_score, price_matched, price_negative = _price_score(price_range, [item])
@@ -318,7 +324,7 @@ def _score_item(
         negative.extend(price_negative)
     if max_price is not None and item.price is not None:
         max_price_score, max_price_matched, max_price_negative = _max_price_score(max_price, [item])
-        score += max(min(max_price_score, 5), -8)
+        score += max(min(max_price_score, 2), -3)
         matched.extend(max_price_matched)
         negative.extend(max_price_negative)
 
@@ -334,22 +340,27 @@ def _cuisine_score(
         return 0, [], []
     cuisine = (restaurant.cuisine or "").lower()
     if cuisine and cuisine in favorite_cuisines:
-        return 20, [f"{cuisine} cuisine"], []
+        return 8, [f"{cuisine} cuisine"], []
     related = favorite_cuisines.intersection(terms)
     if related:
-        return 10, sorted(related), []
-    return -10, [], ["no cuisine match"]
+        return 4, sorted(related), []
+    return 0, [], []
 
 
-def _dietary_score(dietary: set[str], terms: set[str]) -> tuple[int, list[str], list[str]]:
+def _dietary_score(
+    dietary: set[str],
+    terms: set[str],
+    query_tokens: set[str],
+) -> tuple[int, list[str], list[str]]:
     if not dietary:
         return 0, [], []
+    explicit = dietary.intersection(query_tokens)
     matched = dietary.intersection(terms)
-    if len(matched) == len(dietary):
-        return 30, sorted(matched), []
     if matched:
-        return 15, sorted(matched), []
-    return 0, [], ["dietary preference unknown"]
+        return (18 if explicit else 6), sorted(matched), []
+    if explicit:
+        return -8, [], ["missing explicit dietary match"]
+    return 0, [], []
 
 
 def _price_score(price_range: str | None, items: list[FoodItem]) -> tuple[int, list[str], list[str]]:
@@ -376,10 +387,10 @@ def _max_price_score(max_price: float | None, items: list[FoodItem]) -> tuple[in
     average = sum(prices) / len(prices)
     cheapest = min(prices)
     if average <= max_price:
-        return 15, [f"within {max_price:.2f} max"], []
+        return 5, [f"within {max_price:.2f} max"], []
     if cheapest <= max_price:
-        return 6, [f"has options under {max_price:.2f}"], []
-    return -25, [], [f"above {max_price:.2f} max"]
+        return 2, [f"has options under {max_price:.2f}"], []
+    return -4, [], [f"above {max_price:.2f} max"]
 
 
 def _disliked_ingredient_score(
@@ -390,7 +401,7 @@ def _disliked_ingredient_score(
         return 0, [], []
     matched = disliked_ingredients.intersection(terms)
     if matched:
-        return -25, [], [f"contains disliked {item}" for item in sorted(matched)[:3]]
+        return -8, [], [f"contains disliked {item}" for item in sorted(matched)[:3]]
     return 0, [], []
 
 
@@ -411,9 +422,9 @@ def _query_score(query_tokens: set[str], terms: set[str]) -> tuple[int, list[str
         return 0, [], []
     matched = query_tokens.intersection(terms)
     if len(matched) >= 2:
-        return min(30, 14 + 4 * len(matched)), sorted(matched)[:5], []
+        return min(45, 22 + 6 * len(matched)), sorted(matched)[:5], []
     if matched:
-        return 10, sorted(matched), []
+        return 18, sorted(matched), []
     return -10, [], ["no query match"]
 
 
@@ -430,6 +441,9 @@ def _completion_score(score: float) -> float:
 
 
 def _reason(matched: list[str], negative: list[str]) -> str:
+    meaningful_matches = [match for match in matched if match != "open"]
+    if meaningful_matches:
+        return f"Matches {', '.join(_unique(meaningful_matches)[:4])}."
     if matched:
         return f"Matches {', '.join(_unique(matched)[:4])}."
     if negative:

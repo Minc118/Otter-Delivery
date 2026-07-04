@@ -59,6 +59,26 @@ function removeStoredValue(key) {
   window.localStorage.removeItem(key);
 }
 
+export class MissingCheckoutProfileError extends Error {
+  constructor() {
+    super("Please log in before placing an order.");
+    this.name = "MissingCheckoutProfileError";
+    this.code = "MISSING_CHECKOUT_PROFILE";
+  }
+}
+
+function readStoredProfile() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(window.localStorage.getItem("profile"));
+  } catch {
+    return null;
+  }
+}
+
 function readInitialTrackingSnapshot() {
   const activeOrderId = readStoredValue(ACTIVE_ORDER_ID_STORAGE_KEY, null);
   const storedOrders = readStoredValue(TRACKED_ORDERS_STORAGE_KEY, null);
@@ -423,7 +443,11 @@ export function CartProvider({ children }) {
       return null;
     }
 
-    const profile = JSON.parse(localStorage.getItem("profile"));
+    const profile = readStoredProfile();
+
+    if (!profile?.id) {
+      throw new MissingCheckoutProfileError();
+    }
 
     const response = await fetch(`${ORDER_SERVICE_BASE_URL}/orders`, {
       method: "POST",
