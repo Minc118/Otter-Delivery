@@ -12,7 +12,7 @@ const RECOMMENDATION_API_BASE_URL =
   import.meta.env.VITE_RECOMMENDATION_SERVICE_URL ??
   import.meta.env.VITE_RECOMMENDATION_API_URL ??
   "http://localhost:8004";
-const HOMEPAGE_RECOMMENDATION_LIMIT = 3;
+const HOMEPAGE_RECOMMENDATION_LIMIT = 6;
 
 const SEARCH_STOP_WORDS = new Set([
   "and",

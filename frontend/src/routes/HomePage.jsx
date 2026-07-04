@@ -38,19 +38,22 @@ export default function HomePage() {
 
       try {
         const ranked = await searchLiveRestaurantRecommendations();
-        const rankedRecommendations = ranked.recommendations.filter((recommendation) =>
-          liveRestaurantIds.has(String(recommendation.restaurant.id)),
-        );
-        const rankedIds = new Set(
-          rankedRecommendations.map((recommendation) => String(recommendation.restaurant.id)),
-        );
+        const rankedIds = new Set();
+        const rankedRecommendations = ranked.recommendations.filter((recommendation) => {
+          const restaurantId = String(recommendation.restaurant.id);
+          if (!liveRestaurantIds.has(restaurantId) || rankedIds.has(restaurantId)) {
+            return false;
+          }
+          rankedIds.add(restaurantId);
+          return true;
+        });
         const fillRecommendations = restaurantRecommendations.filter(
           (recommendation) => !rankedIds.has(String(recommendation.restaurant.id)),
         );
         const homepageRecommendations = [
           ...rankedRecommendations,
           ...fillRecommendations,
-        ].slice(0, 3);
+        ].slice(0, 6);
 
         setRecommendations(homepageRecommendations);
         setRecommendationSource(ranked.source);
