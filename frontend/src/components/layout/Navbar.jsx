@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { getDeliveryTiming } from "../../hooks/useDeliverySimulation.js";
 import { getTrackedDeliveryOrders } from "../../services/trackingState.js";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 
 const DELIVERY_BADGE_CLASS =
   "hidden md:flex items-center gap-2 rounded-full bg-surface-light px-4 py-2 font-metadata text-metadata";
@@ -18,13 +19,8 @@ export default function Navbar({
   const location = useLocation();
   const [now, setNow] = useState(() => Date.now());
   const [languageOpen, setLanguageOpen] = useState(false);
-  const [language, setLanguage] = useState(
-      localStorage.getItem("lang") || "EN"
-  );
-  useEffect(() => {
-    const savedLang = localStorage.getItem("lang") || "EN";
-    setLanguage(savedLang);
-  }, []);
+  const { language, setLanguage: setLang } = useLanguage();
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (!e.target.closest(".language-dropdown")) {
@@ -98,16 +94,12 @@ export default function Navbar({
     { code: "IT", label: "Italian" },
     { code: "ZH", label: "Chinese" },
     { code: "FA", label: "Persian" },
+    { code: "EN", label: "English" },
   ];
 
   function handleLanguageSelect(lang) {
-    setLanguage(lang);
+    setLang(lang);
     setLanguageOpen(false);
-    localStorage.setItem("lang", lang);
-
-    window.dispatchEvent(
-        new CustomEvent("language-change", { detail: lang })
-    );
   }
   const navLinkClass = ({ isActive }) =>
     `font-body-md text-body-md transition-all duration-150 active:scale-95 ${

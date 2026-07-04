@@ -5,14 +5,13 @@ import {
   getRestaurants,
   getTranslatedRestaurants,
 } from "../services/catalogService.js";
+import { useLanguage } from "../context/LanguageContext.jsx";
 
 export default function RestaurantDiscoveryPage() {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [language, setLanguage] = useState(
-      localStorage.getItem("lang") || "EN"
-  );
+  const { language } = useLanguage();
 
   useEffect(() => {
     document.title = "Restaurant Discovery - Otter Delivery";
@@ -42,18 +41,6 @@ export default function RestaurantDiscoveryPage() {
 
     loadRestaurants();
   }, [language]);
-
-  useEffect(() => {
-    function handleLanguageChange(e) {
-      setLanguage(e.detail);
-    }
-
-    window.addEventListener("language-change", handleLanguageChange);
-
-    return () => {
-      window.removeEventListener("language-change", handleLanguageChange);
-    };
-  }, []);
 
   return (
       <div className="bg-background min-h-full">

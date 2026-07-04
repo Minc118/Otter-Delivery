@@ -14,6 +14,7 @@ import {
 } from "../services/catalogService.js";
 
 import { adaptRestaurant } from "../services/restaurantAdapter.js";
+import { useLanguage } from "../context/LanguageContext.jsx";
 
 export default function RestaurantDetailPage() {
     const { id } = useParams();
@@ -23,10 +24,7 @@ export default function RestaurantDetailPage() {
     const [foodItems, setFoodItems] = useState([]);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
-
-    const [language, setLanguage] = useState(
-        localStorage.getItem("lang") || "EN"
-    );
+    const { language } = useLanguage();
 
     useEffect(() => {
         async function loadRestaurant() {
@@ -36,7 +34,7 @@ export default function RestaurantDetailPage() {
                 let restaurantData;
                 let foodItemsData;
 
-                const lang = localStorage.getItem("lang") || "EN";
+                const lang = language;
 
                 // RESTAURANT (no translated single endpoint yet)
                 restaurantData = await getRestaurantById(id);
@@ -65,18 +63,6 @@ export default function RestaurantDetailPage() {
 
         loadRestaurant();
     }, [id, language]);
-
-    useEffect(() => {
-        function handleLanguageChange(e) {
-            setLanguage(e.detail);
-        }
-
-        window.addEventListener("language-change", handleLanguageChange);
-
-        return () => {
-            window.removeEventListener("language-change", handleLanguageChange);
-        };
-    }, []);
 
     useEffect(() => {
         if (restaurant) {

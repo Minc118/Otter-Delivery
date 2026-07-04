@@ -44,23 +44,44 @@ export default function MenuItemCard({ item, restaurant }) {
 
           <p className="text-sm text-gray-500 mb-4">{item.description}</p>
 
-          <button
-              onClick={() =>
-                  addItem({
-                    restaurantId,
-                    restaurantName,
-                    restaurantMeta,
-                    item: {
-                      ...toCartItemViewModel(item),
-                      restaurantId,
-                      restaurantName,
-                      restaurantMeta,
-                    },
-                  })
-              }
-          >
-            Add to cart
-          </button>
+          {/*<button*/}
+          {/*    onClick={() =>*/}
+          {/*        addItem({*/}
+          {/*          restaurantId,*/}
+          {/*          restaurantName,*/}
+          {/*          restaurantMeta,*/}
+          {/*          item: {*/}
+          {/*            ...toCartItemViewModel(item),*/}
+          {/*            restaurantId,*/}
+          {/*            restaurantName,*/}
+          {/*            restaurantMeta,*/}
+          {/*          },*/}
+          {/*        })*/}
+          {/*    }*/}
+          {/*>*/}
+          {/*  Add to cart*/}
+          {/*</button>*/}
+            <button
+                onClick={() =>
+                    addItem({
+                        restaurantId,
+                        restaurantName,
+                        restaurantMeta,
+                        item: {
+                            ...toCartItemViewModel(item),
+                            restaurantId,
+                            restaurantName,
+                            restaurantMeta,
+                        },
+                    })
+                }
+                className="mt-auto w-full bg-primary-container hover:bg-surface-tint text-on-primary font-button text-button rounded-lg py-3 transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+    <span className="material-symbols-outlined text-[20px]">
+        add
+    </span>
+                Add to cart
+            </button>
         </div>
       </article>
   );
