@@ -5,12 +5,14 @@ import {
   rememberRecommendationAttribution,
 } from "../../services/recommendationService.js";
 
-export default function RecommendationCard({ recommendation }) {
+export default function RecommendationCard({ recommendation, mode = "search" }) {
   const image = recommendation.image ?? { alt: recommendation.title, src: "" };
   const badge = recommendation.badge ?? { icon: "auto_awesome", label: "AI Pick" };
   const tags = recommendation.tags ?? [];
   const restaurantPath = `/restaurants/${recommendation.restaurant.id}`;
   const subtitle = recommendation.subtitle ?? `from ${recommendation.restaurant.name}`;
+  const showMatchBadge = mode === "search" && badge?.label;
+  const showScore = mode === "search" || !isMatchScore(recommendation.price);
 
   function handleClick() {
     rememberRecommendationAttribution(recommendation);
@@ -41,21 +43,25 @@ export default function RecommendationCard({ recommendation }) {
           onError={(event) => applyImageFallback(event, image.fallbackSrc)}
           src={image.src}
         />
-        <div className="absolute top-4 left-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full font-metadata text-metadata flex items-center gap-1 shadow-sm">
-          <span className="material-symbols-outlined text-sm">
-            {badge.icon}
-          </span>
-          {badge.label}
-        </div>
+        {showMatchBadge ? (
+          <div className="absolute top-4 left-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full font-metadata text-metadata flex items-center gap-1 shadow-sm">
+            <span className="material-symbols-outlined text-sm">
+              {badge.icon}
+            </span>
+            {badge.label}
+          </div>
+        ) : null}
       </div>
       <div className="p-6 flex flex-col flex-grow">
         <div className="flex justify-between items-start mb-2 gap-4">
           <h3 className="font-card-title text-card-title text-on-surface">
             {recommendation.title}
           </h3>
-          <span className="font-card-title text-card-title text-primary shrink-0">
-            {recommendation.price}
-          </span>
+          {showScore ? (
+            <span className="font-card-title text-card-title text-primary shrink-0">
+              {recommendation.price}
+            </span>
+          ) : null}
         </div>
         <p className="font-metadata text-metadata text-on-surface-variant mb-4">
           {subtitle}
@@ -83,6 +89,10 @@ export default function RecommendationCard({ recommendation }) {
       </div>
     </Link>
   );
+}
+
+function isMatchScore(value) {
+  return /\bpts\b/i.test(String(value ?? ""));
 }
 
 function getStoredProfileId() {

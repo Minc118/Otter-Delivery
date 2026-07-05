@@ -54,6 +54,15 @@ class DishIntentScoringTests(unittest.TestCase):
     def test_german_rindfleisch_pho_ranks_vietnamese_pho(self) -> None:
         test_german_rindfleisch_pho_ranks_vietnamese_pho()
 
+    def test_exact_query_beats_repeated_unrelated_history(self) -> None:
+        test_exact_query_beats_repeated_unrelated_history()
+
+    def test_history_can_influence_default_recommendations(self) -> None:
+        test_history_can_influence_default_recommendations()
+
+    def test_repeated_order_boost_is_capped(self) -> None:
+        test_repeated_order_boost_is_capped()
+
 
 def test_falafel_query_ranks_falafel_items_above_generic_vegetarian_bowls() -> None:
     results = _score("falafel")
@@ -216,12 +225,47 @@ def test_german_rindfleisch_pho_ranks_vietnamese_pho() -> None:
     assert results[0].recommended_items[0] == "Beef Pho"
 
 
+def test_exact_query_beats_repeated_unrelated_history() -> None:
+    results = _score_with_history("beef pho", {"falafel-sprint": 20})
+
+    assert results[0].restaurant_id == "vietnamese"
+    assert results[0].recommended_items[0] == "Beef Pho"
+    assert _rank(results, "falafel-sprint") > _rank(results, "vietnamese")
+
+
+def test_history_can_influence_default_recommendations() -> None:
+    results = _score_with_history(None, {"sushi": 2})
+
+    assert results[0].restaurant_id == "sushi"
+    assert "previously ordered" in results[0].matched_factors
+
+
+def test_repeated_order_boost_is_capped() -> None:
+    once = _score_with_history(None, {"sushi": 1})
+    repeated = _score_with_history(None, {"sushi": 99})
+    once_sushi = next(result for result in once if result.restaurant_id == "sushi")
+    repeated_sushi = next(result for result in repeated if result.restaurant_id == "sushi")
+
+    assert repeated_sushi.recommendation_score - once_sushi.recommendation_score == 15
+
+
 def _score(query: str):
     return score_restaurants(
         user_id="dish-intent-test-user",
         query=query,
         preferences={},
         restaurants=_catalog(),
+        limit=20,
+    )
+
+
+def _score_with_history(query: str | None, history_by_restaurant: dict[str, int]):
+    return score_restaurants(
+        user_id="dish-intent-test-user",
+        query=query,
+        preferences={},
+        restaurants=_catalog(),
+        history_by_restaurant=history_by_restaurant,
         limit=20,
     )
 

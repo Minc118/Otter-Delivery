@@ -114,7 +114,7 @@ export async function searchLiveRestaurantRecommendations(query, options = {}) {
   return {
     recommendations: (data.recommendations ?? [])
       .slice(0, limit)
-      .map((item, index) => toRecommendationCardModel(item, index, data.requestId)),
+      .map((item, index) => toSearchRecommendationCardModel(item, index, data.requestId)),
     source: data.source ?? "fallback",
     requestId: data.requestId ?? null,
   };
@@ -134,10 +134,7 @@ function toRestaurantRecommendationCardModel(restaurant, index) {
       name: restaurant.name,
     },
     subtitle: cuisine,
-    badge: {
-      icon: index === 0 ? "auto_awesome" : "restaurant",
-      label: index === 0 ? "Today's Pick" : "Live Restaurant",
-    },
+    badge: null,
     image: restaurant.image,
     reason: `Open from the live restaurant catalog. ${firstTag} is available for today's demo flow.`,
     tags: [restaurant.rating ? `${restaurant.rating} rating` : null, restaurant.eta, cuisine]
@@ -146,7 +143,7 @@ function toRestaurantRecommendationCardModel(restaurant, index) {
   };
 }
 
-function toRecommendationCardModel(item, index, requestId = null) {
+export function toSearchRecommendationCardModel(item, index, requestId = null) {
   const recommendedItems = item.recommendedItems ?? item.recommended_items ?? [];
   const title = recommendedItems[0] ?? item.restaurantName ?? item.restaurant_name;
   const restaurantId = item.restaurantId ?? item.restaurant_id;
