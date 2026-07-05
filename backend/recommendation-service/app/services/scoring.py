@@ -88,6 +88,22 @@ CONCRETE_DISH_TERMS = {
 }
 
 
+MUTUALLY_EXCLUSIVE_DISHES = {
+    "burger",
+    "pizza",
+    "sushi",
+    "falafel",
+    "kebab",
+    "doner",
+    "döner",
+    "taco",
+    "burrito",
+    "pho",
+    "ramen",
+    "pasta",
+}
+
+
 INGREDIENT_TERMS = {
     "beef",
     "rindfleisch",
@@ -328,6 +344,24 @@ def score_restaurants(
             if not allowed_dish_terms.intersection(all_restaurant_tokens):
                 score -= 100
                 negative_factors.append("no concrete dish match")
+
+                # Check for conflicting concrete dish types
+                conflicting_matches = all_restaurant_tokens.intersection(MUTUALLY_EXCLUSIVE_DISHES)
+                if conflicting_matches:
+                    has_true_conflict = False
+                    for conflict in conflicting_matches:
+                        # Allow pho/ramen/noodle fallbacks
+                        if query_dishes.intersection({"pho", "ramen"}) and conflict in {"pho", "ramen"}:
+                            continue
+                        # Allow pizza/pasta fallbacks
+                        if query_dishes.intersection({"pizza", "pasta"}) and conflict in {"pizza", "pasta"}:
+                            continue
+                        has_true_conflict = True
+                        break
+
+                    if has_true_conflict:
+                        score -= 150
+                        negative_factors.append("conflicting dish type")
 
         identity_matches = raw_query_tokens.intersection(_restaurant_identity_terms(restaurant))
         if identity_matches:

@@ -16,6 +16,8 @@ def client(repository: MemoryDriverRepository) -> TestClient:
     settings = Settings(
         DRIVER_DATABASE_URL=None,
         DATABASE_URL=None,
+        GOOGLE_ROUTES_API_KEY=None,
+        GOOGLE_MAPS_API_KEY=None,
         ETA_MINUTES=40,
     )
     with TestClient(create_app(repository=repository, settings=settings)) as test_client:
