@@ -1,4 +1,8 @@
+version: "3.9"
+
 services:
+
+
   frontend:
     image: node:20-alpine
     working_dir: /app/frontend
@@ -15,13 +19,26 @@ services:
       VITE_PROFILE_SERVICE_URL: http://localhost:${PROFILE_SERVICE_PORT:-8006}
       VITE_RECOMMENDATION_API_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
       VITE_RECOMMENDATION_SERVICE_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
+      VITE_TRANSLATION_SERVICE_URL: http://localhost:${TRANSLATION_SERVICE_PORT:-8005}
     depends_on:
       - restaurant-service
       - order-service
       - profile-service
       - driver-service
       - recommendation-service
+      - translation-service
 
+#
+#  restaurant-service:
+#    platform: linux/amd64
+#    build:
+#      context: ./backend/restaurant-service
+#    ports:
+#      - "${RESTAURANT_SERVICE_PORT:-8001}:8001"
+#    environment:
+#      SPRING_PROFILES_ACTIVE: dev
+#      SEED_DEMO_DATA: "true"
+#      SERVER_PORT: 8001
   restaurant-service:
     platform: linux/amd64
     build:
@@ -32,6 +49,9 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SEED_DEMO_DATA: "true"
       SERVER_PORT: 8001
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
 
   order-service:
     build:
@@ -44,6 +64,7 @@ services:
     depends_on:
       - restaurant-service
 
+
   driver-service:
     build:
       context: ./backend/driver-service
@@ -52,11 +73,10 @@ services:
     environment:
       PORT: 8003
       DRIVER_REPOSITORY_MODE: memory
-      DRIVER_DATABASE_URL: ${DRIVER_DATABASE_URL:-}
-      DATABASE_URL: ${DATABASE_URL:-}
       ETA_MINUTES: 40
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       GOOGLE_ROUTES_API_KEY: ${GOOGLE_ROUTES_API_KEY:-}
+
 
   profile-service:
     build:
@@ -72,6 +92,7 @@ services:
     depends_on:
       - order-service
 
+
   recommendation-service:
     build:
       context: ./backend/recommendation-service
@@ -79,17 +100,13 @@ services:
       - "${RECOMMENDATION_SERVICE_PORT:-8004}:8004"
     environment:
       PORT: 8004
-      RECOMMENDATION_DATABASE_URL: ${RECOMMENDATION_DATABASE_URL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      RESTAURANT_SERVICE_URL: http://restaurant-service:8001
       GEMINI_ENABLED: ${GEMINI_ENABLED:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
-      GEMINI_CANDIDATE_LIMIT: ${GEMINI_CANDIDATE_LIMIT:-5}
-      GEMINI_MENU_ITEM_LIMIT: ${GEMINI_MENU_ITEM_LIMIT:-3}
-      RESTAURANT_SERVICE_URL: http://restaurant-service:8001
     depends_on:
       - restaurant-service
+
 
   translation-service:
     build:
@@ -100,15 +117,10 @@ services:
       SERVER_PORT: 8005
       RESTAURANT_SERVICE_BASE_URL: http://restaurant-service:8001/api
       DEEPL_API_KEY: ${DEEPL_API_KEY:-}
-      DEEPL_BASE_URL: ${DEEPL_BASE_URL:-https://api-free.deepl.com/v2/translate}
+      DEEPL_BASE_URL: https://api-free.deepl.com/v2/translate
     depends_on:
       - restaurant-service
 
-  # Placeholder teammate services, not implemented yet:
-  # auth-service:
-  #   image: quay.io/keycloak/keycloak:latest
-  #   ports:
-  #     - "8080:8080"
 
 volumes:
   frontend_node_modules:
