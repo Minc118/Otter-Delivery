@@ -41,7 +41,8 @@ export function getRestaurantCheckoutMeta(restaurantId, restaurantMeta = null) {
       rating: "4.8 Excellent",
       image: {
         alt: "Restaurant",
-        src: "https://lh3.googleusercontent.com/aida-public/AB6AXuDSUUeBMXx_HWxOJT_MnmXfnjZQxYbjXj5M4KwbuTDzvElPYKUKyCiPTP8yEci_ygW4itmXgMD4hPMBFfPkUhwgEz1dwF2eGqehWXHl8RdOR_V2GfPBuE_W756Mx7hUEOlbGjpkofm7fk2-KvpMl2IlQehZKHr11ulmJjRDVQUmlNPIUbr_AMW7nFgDx3oOH3XDm1oXd4AtM5jLbvSY-mxyIcsuyCxC5X8BmuxNDUFe5mipgMr7UNexbzvq1TgcR18Goe2eLKpVF1A",
+        src: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80",
+        fallbackSrc: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80",
       },
     }
   );

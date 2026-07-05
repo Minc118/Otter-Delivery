@@ -8,6 +8,8 @@ from app.database import get_db
 from app.schemas import (
     FeedbackCreateRequest,
     FeedbackCreateResponse,
+    RecommendationEventCreate,
+    RecommendationEventResponse,
     RecommendationFeedback,
     RecommendationFeedbackCreate,
     RecommendationHistory,
@@ -49,6 +51,16 @@ def create_feedback(
 ) -> FeedbackCreateResponse:
     service = RecommendationService(db, settings)
     return service.create_mvp_feedback(payload)
+
+
+@router.post("/recommendations/events", response_model=RecommendationEventResponse)
+def create_recommendation_event(
+    payload: RecommendationEventCreate,
+    db: Session | None = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RecommendationEventResponse:
+    service = RecommendationService(db, settings)
+    return service.create_recommendation_event(payload)
 
 
 @router.get("/recommendations/history/{userId}", response_model=RecommendationHistory)

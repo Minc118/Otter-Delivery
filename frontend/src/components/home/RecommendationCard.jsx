@@ -1,4 +1,9 @@
 import { Link } from "react-router-dom";
+import { applyImageFallback } from "../../services/restaurantAdapter.js";
+import {
+  logRecommendationEvent,
+  rememberRecommendationAttribution,
+} from "../../services/recommendationService.js";
 
 export default function RecommendationCard({ recommendation }) {
   const image = recommendation.image ?? { alt: recommendation.title, src: "" };
@@ -7,16 +12,33 @@ export default function RecommendationCard({ recommendation }) {
   const restaurantPath = `/restaurants/${recommendation.restaurant.id}`;
   const subtitle = recommendation.subtitle ?? `from ${recommendation.restaurant.name}`;
 
+  function handleClick() {
+    rememberRecommendationAttribution(recommendation);
+    void logRecommendationEvent({
+      requestId: recommendation.recommendationRequestId,
+      profileId: getStoredProfileId(),
+      restaurantId: recommendation.restaurant.id,
+      eventType: "click",
+      metadata: {
+        rank: recommendation.recommendationRank,
+        title: recommendation.title,
+        surface: "recommendation_card",
+      },
+    });
+  }
+
   return (
     <Link
       aria-label={`View ${recommendation.title}`}
       className="bg-surface-light rounded-xl overflow-hidden border border-surface flex flex-col hover:ai-shadow hover:border-primary-light transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-container"
+      onClick={handleClick}
       to={restaurantPath}
     >
       <div className="h-48 relative">
         <img
           alt={image.alt}
           className="w-full h-full object-cover"
+          onError={(event) => applyImageFallback(event, image.fallbackSrc)}
           src={image.src}
         />
         <div className="absolute top-4 left-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full font-metadata text-metadata flex items-center gap-1 shadow-sm">
@@ -61,4 +83,13 @@ export default function RecommendationCard({ recommendation }) {
       </div>
     </Link>
   );
+}
+
+function getStoredProfileId() {
+  try {
+    const profile = JSON.parse(window.localStorage.getItem("profile"));
+    return profile?.id ? String(profile.id) : "guest";
+  } catch {
+    return "guest";
+  }
 }

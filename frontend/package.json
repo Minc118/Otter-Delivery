@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "validate:restaurant-labels": "node scripts/validateRestaurantLabels.mjs",
+    "validate:order-history-flow": "node scripts/validateOrderHistoryFlow.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

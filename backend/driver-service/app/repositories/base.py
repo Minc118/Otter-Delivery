@@ -5,6 +5,7 @@ from app.models import (
     Driver,
     Location,
     RouteEstimate,
+    TrackingSnapshot,
     TrackingResponse,
 )
 
@@ -25,3 +26,7 @@ class DriverRepository(Protocol):
     def get_tracking(self, order_id: str) -> TrackingResponse: ...
 
     def save_route_estimate(self, estimate: RouteEstimate) -> RouteEstimate: ...
+
+    def update_assignment_status(
+        self, order_id: str, status: str, message: str | None = None
+    ) -> TrackingResponse: ...

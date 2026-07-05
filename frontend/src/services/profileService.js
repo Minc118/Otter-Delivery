@@ -55,10 +55,6 @@ export async function getProfile(profileId) {
     return requestProfileService(`/profiles/${profileId}`);
 }
 
-export async function getOrders(profileId) {
-    return requestProfileService(`/profiles/${profileId}/orders`);
-}
-
 export async function updateProfile(profileId, profile) {
     return requestProfileService(`/profiles/${profileId}`, {
         method: "PUT",

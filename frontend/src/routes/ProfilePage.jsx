@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.jsx";
 import {
   getProfile,
-  getOrders,
   isProfileServiceUnavailable,
 } from "../services/profileService.js";
+import { getCustomerOrderHistory } from "../services/orderHistoryService.js";
 import { searchLiveRestaurantRecommendations } from "../services/recommendationService.js";
 import { getRestaurantById } from "../services/catalogService.js";
 import ProfileSummary from "../components/profile/ProfileSummary.jsx";
 import ProfileSettingsDetails from "../components/profile/ProfileSettingsDetails.jsx";
+import { getLatestOrderStatusMeta } from "../services/orderStatus.js";
+import { normalizeMenuItemName } from "../services/restaurantAdapter.js";
+import { formatCurrency } from "../utils/currency.js";
+import useCart from "../hooks/useCart.js";
 
 const profileSettings = {
   language: {
@@ -37,6 +42,7 @@ const profileSettings = {
 };
 
 export default function ProfilePage() {
+  const { trackedOrders } = useCart();
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -70,13 +76,13 @@ export default function ProfilePage() {
       let loadedOrders = [];
 
       try {
-        loadedOrders = await getOrders(activeProfile.id);
+        loadedOrders = await getCustomerOrderHistory(activeProfile.id);
         setOrders(loadedOrders);
       } catch (error) {
         setProfileError(
             isProfileServiceUnavailable(error)
                 ? "Profile service is currently unavailable"
-                : "Profile data could not be loaded",
+                : "Order history could not be loaded",
         );
       }
 
@@ -195,12 +201,20 @@ export default function ProfilePage() {
                     ) : (
                         <div className="space-y-4">
                           {orders.map((order) => {
-                            const item = order.items?.[0];
+                            const trackedOrder = trackedOrders.find(
+                                (tracked) => String(tracked.id) === String(order.id),
+                            );
+                            const displayOrder = trackedOrder
+                                ? { ...order, ...trackedOrder }
+                                : order;
+                            const item = displayOrder.items?.[0];
+                            const status = getLatestOrderStatusMeta(displayOrder);
 
                             return (
-                                <article
+                                <Link
                                     key={order.id}
-                                    className="rounded-xl border border-surface p-4 flex justify-between gap-4"
+                                    className="rounded-xl border border-surface p-4 flex justify-between gap-4 transition-colors hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-primary"
+                                    to={`/orders/${order.id}/tracking`}
                                 >
                                   <div>
                                     <h3 className="font-bold text-on-surface">
@@ -208,24 +222,24 @@ export default function ProfilePage() {
                                     </h3>
 
                                     <p className="text-sm text-on-surface-variant">
-                                      {item?.itemName}
+                                      {normalizeMenuItemName(item?.itemName ?? item?.name ?? "Order item")}
                                     </p>
 
                                     <p className="text-sm text-on-surface-variant">
-                                      Quantity: {item?.quantity}
+                                      Quantity: {item?.quantity ?? 1}
                                     </p>
                                   </div>
 
                                   <div className="text-right">
                 <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-semibold text-primary">
-                  {order.status}
+                  {status.label}
                 </span>
 
                                     <p className="font-bold mt-3">
-                                      €{order.totalPrice}
+                                      {formatProfileOrderTotal(displayOrder)}
                                     </p>
                                   </div>
-                                </article>
+                                </Link>
                             );
                           })}
                         </div>
@@ -237,4 +251,15 @@ export default function ProfilePage() {
         </PageShell>
       </div>
   );
+}
+
+function formatProfileOrderTotal(order) {
+  if (Number.isFinite(order.totalCents)) {
+    return formatCurrency(order.totalCents);
+  }
+  if (Number.isFinite(order.totalPrice)) {
+    return `€${Number(order.totalPrice).toFixed(2)}`;
+  }
+  const parsedTotal = Number.parseFloat(String(order.totalPrice ?? "").replace(",", "."));
+  return Number.isFinite(parsedTotal) ? `€${parsedTotal.toFixed(2)}` : "€0.00";
 }

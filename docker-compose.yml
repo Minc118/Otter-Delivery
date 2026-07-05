@@ -40,6 +40,9 @@ services:
       - "${ORDER_SERVICE_PORT:-8002}:8002"
     environment:
       SERVER_PORT: 8002
+      ORDER_DATABASE_URL: ${ORDER_DATABASE_URL:-jdbc:h2:mem:orders;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+      ORDER_DATABASE_USERNAME: ${ORDER_DATABASE_USERNAME:-sa}
+      ORDER_DATABASE_PASSWORD: ${ORDER_DATABASE_PASSWORD:-}
       RESTAURANT_SERVICE_URL: http://restaurant-service:8001
     depends_on:
       - restaurant-service
@@ -51,7 +54,7 @@ services:
       - "${DRIVER_SERVICE_PORT:-8003}:8003"
     environment:
       PORT: 8003
-      DRIVER_REPOSITORY_MODE: memory
+      DRIVER_REPOSITORY_MODE: ${DRIVER_REPOSITORY_MODE:-memory}
       DRIVER_DATABASE_URL: ${DRIVER_DATABASE_URL:-}
       DATABASE_URL: ${DATABASE_URL:-}
       ETA_MINUTES: 40

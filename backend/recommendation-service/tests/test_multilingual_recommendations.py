@@ -77,8 +77,8 @@ class RamenAndHalalRestaurantClient:
                 food_items=[
                     FoodItem(
                         food_item_id="halal-doner",
-                        name="Halal Chicken Doner Plate",
-                        description="Halal chicken doner with rice, salad, garlic sauce, and warm flatbread.",
+                        name="Chicken Doner Plate",
+                        description="Halal-friendly chicken doner with rice, salad, garlic sauce, and warm flatbread.",
                         price=13.9,
                         tags=["halal", "turkish"],
                     )

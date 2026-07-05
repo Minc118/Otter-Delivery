@@ -14,6 +14,10 @@ import {
 import { getOrderById } from "../services/orderService.js";
 import { normalizeRouteEstimate } from "../services/trackingState.js";
 import { getRoutePoints, normalizeRoutePoint } from "../services/routeGeometry.js";
+import {
+  getTrackingStatusText,
+  getTrackingStatusTitle,
+} from "../services/orderStatus.js";
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
@@ -121,6 +125,7 @@ export default function OrderTrackingPage() {
 function shouldRequestBackendTracking(storedOrder) {
   return Boolean(
     storedOrder?.assignmentStatus === "assigned" &&
+      !storedOrder.deliveredAt &&
       storedOrder.trackingStartedAt &&
       (storedOrder.assignment || storedOrder.assignedDriver),
   );
@@ -131,11 +136,15 @@ function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
     return fallbackOrder;
   }
 
+  const snapshot = storedOrder.trackingSnapshot ?? {};
   const assignmentStatus = storedOrder.assignmentStatus;
+  const displayStatus = storedOrder.deliveredAt ? "delivered" : assignmentStatus;
   const assignedDriverName =
-    storedOrder.assignedDriver?.name ?? "Driver pending";
+    storedOrder.assignedDriver?.name ?? snapshot.driver?.name ?? "Driver pending";
   const hasTracking = tracking?.assignment || tracking?.events?.length > 0;
-  const routeEstimate = normalizeRouteEstimate(storedOrder.routeEstimate);
+  const routeEstimate = normalizeRouteEstimate(
+    storedOrder.routeEstimate ?? snapshot.routeEstimate,
+  );
   const latestTrackedLocation = [...(tracking?.events ?? [])]
     .reverse()
     .find((event) => event.location)?.location;
@@ -148,26 +157,30 @@ function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
     rider: {
       name: assignedDriverName,
     },
-    statusText: getStatusText(assignmentStatus, hasTracking),
-    statusTitle: getStatusTitle(assignmentStatus),
+    statusText: getTrackingStatusText(displayStatus, hasTracking),
+    statusTitle: getTrackingStatusTitle(displayStatus),
     estimatedArrival:
-      storedOrder.estimatedDeliveryTime ?? routeEstimate?.etaLabel ?? "Pending",
-    routePoints: routeEstimate?.routePoints,
-    encodedPolyline: routeEstimate?.encodedPolyline,
+      storedOrder.deliveredAt
+        ? "Delivered"
+        : storedOrder.estimatedDeliveryTime ?? snapshot.estimatedDeliveryTime ?? routeEstimate?.etaLabel ?? "Pending",
+    routePoints: routeEstimate?.routePoints ?? snapshot.routePoints,
+    encodedPolyline: routeEstimate?.encodedPolyline ?? snapshot.encodedPolyline,
     routeProvider:
-      routeEstimate?.provider ??
+      routeEstimate?.provider ?? snapshot.routeProvider ??
       (storedOrder.assignmentStatus === "assigned" ||
       storedOrder.assignmentStatus === "failed" ||
       storedOrder.assignmentStatus === "pending"
         ? "coordinate_fallback"
         : null),
-    routeDurationSeconds: routeEstimate?.durationSeconds,
+    routeDurationSeconds: routeEstimate?.durationSeconds ?? snapshot.routeDurationSeconds,
     pickupLocation:
-      routeEstimate?.originLocation ?? storedOrder.pickupLocation,
+      routeEstimate?.originLocation ?? storedOrder.pickupLocation ?? snapshot.pickupLocation,
     deliveryLocation:
-      routeEstimate?.destinationLocation ?? {
-        lat: storedOrder.deliveryAddress.latitude,
-        lng: storedOrder.deliveryAddress.longitude,
+      routeEstimate?.destinationLocation ??
+      storedOrder.deliveryLocation ??
+      snapshot.deliveryLocation ?? {
+        lat: storedOrder.deliveryAddress?.latitude,
+        lng: storedOrder.deliveryAddress?.longitude,
       },
     driverLocation:
       latestTrackedLocation ?? storedOrder.assignedDriver?.currentLocation,
@@ -181,26 +194,6 @@ function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
     deliveryFeeCents: storedOrder.deliveryFeeCents,
     serviceFeeCents: 0,
   };
-}
-
-function getStatusText(assignmentStatus, hasTracking) {
-  if (hasTracking) {
-    return "Driver assigned";
-  }
-  if (assignmentStatus === "failed") {
-    return "Driver assignment temporarily unavailable";
-  }
-  return "Preparing order";
-}
-
-function getStatusTitle(assignmentStatus) {
-  if (assignmentStatus === "assigned") {
-    return "Driver accepted your order";
-  }
-  if (assignmentStatus === "failed") {
-    return "We are still assigning a driver";
-  }
-  return "Your order is being prepared";
 }
 
 function hasRouteMap(order) {
@@ -229,8 +222,8 @@ function PendingTrackingPanel({ order }) {
           Preparing your order
         </h2>
         <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
-          Tracking map for order #{order.displayId} will appear once route
-          information is available. No sample driver location is being shown.
+          Tracking map for order #{order.displayId} will appear when saved route
+          information is available. Older orders without a route snapshot show this summary instead.
         </p>
       </div>
     </div>

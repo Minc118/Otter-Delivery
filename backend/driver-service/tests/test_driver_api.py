@@ -2,7 +2,10 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.models import EstimateRequest, Location
+from app.config import Settings
+from app.main import _build_repository
 from app.repositories.memory_repository import MemoryDriverRepository
+from app.repositories.postgres_repository import PostgresDriverRepository
 from app.services.route_estimator import RouteEstimator
 
 
@@ -22,6 +25,33 @@ def test_health_reports_memory_mode_without_configuration(client: TestClient) ->
         "service": "driver-service",
         "repositoryMode": "memory",
     }
+
+
+def test_repository_mode_requires_database_url_for_explicit_postgres() -> None:
+    settings = Settings(
+        DRIVER_REPOSITORY_MODE="postgres",
+        DRIVER_DATABASE_URL=None,
+        DATABASE_URL=None,
+    )
+
+    try:
+        _build_repository(settings)
+    except RuntimeError as exc:
+        assert "DRIVER_DATABASE_URL" in str(exc)
+    else:
+        raise AssertionError("postgres mode must not silently fall back to memory")
+
+
+def test_auto_repository_mode_uses_postgres_when_database_url_exists() -> None:
+    settings = Settings(
+        DRIVER_REPOSITORY_MODE="auto",
+        DRIVER_DATABASE_URL="postgresql://example.invalid/postgres",
+        DATABASE_URL=None,
+    )
+
+    repository = _build_repository(settings)
+
+    assert isinstance(repository, PostgresDriverRepository)
 
 
 def test_available_drivers_has_frontend_shape(client: TestClient) -> None:
@@ -95,6 +125,8 @@ def test_tracking_response_has_frontend_shape(client: TestClient) -> None:
     assert payload["assignment"]["status"] == "ASSIGNED"
     assert payload["events"][0]["eventType"] == "DRIVER_ASSIGNED"
     assert payload["events"][0]["location"].keys() == {"lat", "lng"}
+    assert payload["latestSnapshot"]["status"] == "ASSIGNED"
+    assert payload["latestSnapshot"]["driverLocation"].keys() == {"lat", "lng"}
 
 
 def test_updates_driver_position(client: TestClient) -> None:
@@ -131,6 +163,27 @@ def test_estimate_returns_mock_distance_and_eta(client: TestClient) -> None:
     assert payload["estimate"]["routePoints"][0] == {"lat": 52.52, "lng": 13.405}
     assert payload["estimate"]["routePoints"][-1] == {"lat": 52.5, "lng": 13.4}
     assert payload["estimate"]["encodedPolyline"] is None
+
+    tracking = client.get("/orders/order-estimate/tracking").json()
+    assert tracking["latestRouteEstimate"]["provider"] == "mock"
+    assert tracking["latestSnapshot"]["routeProvider"] == "mock"
+    assert tracking["latestSnapshot"]["routePoints"][0] == {"lat": 52.52, "lng": 13.405}
+
+
+def test_status_update_is_persisted_in_tracking(client: TestClient) -> None:
+    client.post("/drivers/assign", json={"orderId": "order-status"})
+
+    response = client.patch(
+        "/orders/order-status/tracking/status",
+        json={"status": "IN_TRANSIT", "message": "Courier is on the way."},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["assignment"]["status"] == "IN_TRANSIT"
+    assert payload["events"][-1]["eventType"] == "DELIVERY_STATUS_CHANGED"
+    assert payload["events"][-1]["message"] == "Courier is on the way."
+    assert payload["latestSnapshot"]["status"] == "IN_TRANSIT"
 
 
 def test_estimate_uses_driver_already_assigned_to_order(client: TestClient) -> None:

@@ -25,6 +25,10 @@ public class OrderService {
                             Long restaurantId,
                             List<OrderItem> items) {
 
+        if (customerId == null || restaurantId == null) {
+            return null;
+        }
+
         if (items == null || items.isEmpty()) {
             return null;
         }
@@ -97,6 +101,6 @@ public class OrderService {
     }
 
     public List<Order> getOrdersByCustomerId(Long customerId) {
-        return orderRepository.findByCustomerId(customerId);
+        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
     }
 }

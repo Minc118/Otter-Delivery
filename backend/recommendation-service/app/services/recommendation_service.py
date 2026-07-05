@@ -1,7 +1,7 @@
 from decimal import Decimal
 from datetime import datetime
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -17,6 +17,8 @@ from app.schemas import (
     FeedbackCreateResponse,
     RecommendationFeedback,
     RecommendationFeedbackCreate,
+    RecommendationEventCreate,
+    RecommendationEventResponse,
     RecommendationHistory,
     RecommendationItem,
     RecommendationRequestCreate,
@@ -112,6 +114,7 @@ class RecommendationService:
                     "language": normalized.original_language,
                     "query": payload.free_text,
                     "preferences": request_preferences,
+                    "normalized_intent": _normalized_intent_snapshot(normalized),
                     "recommended_restaurants": [item.to_public_dict() for item in candidates],
                     "source": "fallback",
                 }
@@ -140,6 +143,7 @@ class RecommendationService:
             query=payload.free_text,
             request_preferences=request_preferences,
             stored_preferences=stored_preferences,
+            normalized_intent=_normalized_intent_snapshot(normalized),
             recommendations=recommendations,
         )
 
@@ -187,17 +191,19 @@ class RecommendationService:
         if catalog_fallback and source == "fallback":
             source = "fallback"
 
-        self._store_recommendation_run(
+        request_id = self._store_recommendation_run(
             user_id=payload.user_id,
             query=payload.query,
             language=normalized.original_language,
             request_preferences=request_preferences,
             stored_preferences=stored_preferences,
+            normalized_intent=_normalized_intent_snapshot(normalized),
             candidates=public_candidates,
             source=source,
         )
 
         return RestaurantRecommendationResponse(
+            request_id=request_id,
             recommendations=[
                 RestaurantRecommendationItem(**candidate.to_public_dict())
                 for candidate in public_candidates
@@ -265,6 +271,7 @@ class RecommendationService:
                     free_text=request.free_text,
                     request_preferences=request.request_preferences or {},
                     stored_preferences=request.stored_preferences or {},
+                    normalized_intent=request.normalized_intent or {},
                     created_at=request.created_at,
                     results=[_result_to_schema(result) for result in request.results],
                 )
@@ -346,6 +353,38 @@ class RecommendationService:
             stored=False,
         )
 
+    def create_recommendation_event(
+        self,
+        payload: RecommendationEventCreate,
+    ) -> RecommendationEventResponse:
+        request_id = _parse_uuid(payload.request_id)
+        if self.db is not None:
+            try:
+                event = recommendation_repository.create_recommendation_event(
+                    self.db,
+                    request_id=request_id,
+                    profile_id=payload.profile_id,
+                    restaurant_id=payload.restaurant_id,
+                    event_type=payload.event_type,
+                    order_id=payload.order_id,
+                    metadata=payload.metadata,
+                )
+                return RecommendationEventResponse(id=event.id, stored=True)
+            except SQLAlchemyError:
+                pass
+
+        stored = memory_store.save_recommendation_event(
+            {
+                "request_id": str(payload.request_id) if payload.request_id else None,
+                "profile_id": payload.profile_id,
+                "restaurant_id": payload.restaurant_id,
+                "event_type": payload.event_type,
+                "order_id": payload.order_id,
+                "metadata": payload.metadata,
+            }
+        )
+        return RecommendationEventResponse(id=stored["id"], stored=False)
+
     def _stored_preferences(self, user_id: str) -> dict[str, Any]:
         if self.db is None:
             preference = memory_store.get_preference(user_id)
@@ -372,6 +411,7 @@ class RecommendationService:
         query: str | None,
         request_preferences: dict[str, Any],
         stored_preferences: dict[str, Any],
+        normalized_intent: dict[str, Any],
         recommendations: list[dict[str, Any]],
     ):
         return recommendation_repository.create_request_with_results(
@@ -381,6 +421,7 @@ class RecommendationService:
             free_text=query,
             request_preferences=request_preferences,
             stored_preferences=stored_preferences,
+            normalized_intent=normalized_intent,
             restaurant_service_url=self.settings.restaurant_service_url,
             recommendations=recommendations,
         )
@@ -393,11 +434,12 @@ class RecommendationService:
         language: str,
         request_preferences: dict[str, Any],
         stored_preferences: dict[str, Any],
+        normalized_intent: dict[str, Any],
         candidates: list[ScoredCandidate],
         source: str,
-    ) -> None:
+    ) -> UUID | str:
         legacy_results = [candidate.to_legacy_result() for candidate in candidates]
-        request_id = None
+        request_id: UUID | str = uuid4()
         if self.db is not None:
             try:
                 request, _ = self._persist_request_results(
@@ -406,6 +448,7 @@ class RecommendationService:
                     query=query,
                     request_preferences=request_preferences,
                     stored_preferences=stored_preferences,
+                    normalized_intent=normalized_intent,
                     recommendations=legacy_results,
                 )
                 request_id = request.id
@@ -420,16 +463,18 @@ class RecommendationService:
                         for candidate in candidates
                     ],
                 )
-                return
+                return request_id
             except SQLAlchemyError:
                 pass
 
         memory_store.save_history(
             {
+                "request_id": str(request_id),
                 "user_id": user_id,
                 "language": language,
                 "query": query,
                 "preferences": request_preferences,
+                "normalized_intent": normalized_intent,
                 "recommended_restaurants": [candidate.to_public_dict() for candidate in candidates],
                 "source": source,
             }
@@ -440,6 +485,7 @@ class RecommendationService:
                 for candidate in candidates
             ]
         )
+        return request_id
 
 
 def _merge_preferences(
@@ -517,6 +563,28 @@ def _parse_datetime(value: Any) -> datetime:
     if isinstance(value, str):
         return datetime.fromisoformat(value)
     return datetime.utcnow()
+
+
+def _normalized_intent_snapshot(
+    normalized: NormalizedRecommendationInput,
+) -> dict[str, Any]:
+    return {
+        "original_query": normalized.original_query,
+        "canonical_query": normalized.canonical_query,
+        "original_language": normalized.original_language,
+        "canonical_preferences": normalized.canonical_preferences,
+    }
+
+
+def _parse_uuid(value: UUID | str | None) -> UUID | None:
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    try:
+        return UUID(str(value))
+    except ValueError:
+        return None
 
 
 def _result_to_schema(result: models.RecommendationResult) -> RecommendationItem:
