@@ -15,6 +15,7 @@ import {
   getHomepageRestaurantRecommendations,
   getRecommendations,
   searchRecommendations,
+  toSearchRecommendationCardModel,
 } from "../src/services/recommendationService.js";
 import { recommendations } from "../src/data/recommendations.js";
 
@@ -23,6 +24,9 @@ const discoveryPageSource = readFileSync(new URL("../src/routes/RestaurantDiscov
 const restaurantGridSource = readFileSync(new URL("../src/components/restaurant/RestaurantGrid.jsx", import.meta.url), "utf8");
 const menuItemCardSource = readFileSync(new URL("../src/components/restaurant/MenuItemCard.jsx", import.meta.url), "utf8");
 const restaurantAdapterSource = readFileSync(new URL("../src/services/restaurantAdapter.js", import.meta.url), "utf8");
+const recommendationCardSource = readFileSync(new URL("../src/components/home/RecommendationCard.jsx", import.meta.url), "utf8");
+const recommendationSectionSource = readFileSync(new URL("../src/components/home/RecommendationSection.jsx", import.meta.url), "utf8");
+const recommendationServiceSource = readFileSync(new URL("../src/services/recommendationService.js", import.meta.url), "utf8");
 assert(filterBarSource.includes("bg-surface-container-lowest rounded-xl p-4 border border-surface-variant shadow-sm"), "Filter bar should keep its visual class shape");
 assert(!/\b(sticky|fixed|top-\d+|z-40)\b/.test(filterBarSource), "Filter bar should scroll in normal page flow");
 assert(!filterBarSource.includes("bg-gradient-to-b") && !filterBarSource.includes("mask"), "Filter bar should not own a fade or mask");
@@ -31,6 +35,12 @@ assert(!discoveryPageSource.includes("pointer-events-none sticky"), "Discovery p
 assert(restaurantGridSource.includes("showRibbon={false}"), "Discovery restaurant cards should hide AI Pick ribbons");
 assert(!menuItemCardSource.includes("AI Recommended"), "Normal menu item cards should not show AI Recommended badges");
 assert(!restaurantAdapterSource.includes("label: \"AI Pick\""), "Restaurant adapter should not synthesize AI Pick ribbons for normal browsing");
+assert(recommendationSectionSource.includes('const cardMode = activeQuery ? "search" : "today";'), "Homepage recommendations should render in today mode until the user searches");
+assert(recommendationSectionSource.includes("mode={cardMode}"), "Recommendation cards should receive the active display mode");
+assert(recommendationCardSource.includes('mode = "search"'), "Recommendation cards should default to search mode for match result badges");
+assert(recommendationCardSource.includes('mode === "search" && badge?.label'), "Recommendation match badges should render only in search mode");
+assert(recommendationCardSource.includes('mode === "search" || !isMatchScore(recommendation.price)'), "Recommendation match scores should render only in search mode");
+assert(recommendationServiceSource.includes("badge: null"), "Initial homepage restaurant recommendations should not include top-left match badges");
 
 const cases = [
   {
@@ -196,8 +206,29 @@ assert(profileTrackingPath({ id: "ot-demo-123" }) === "/orders/ot-demo-123/track
 assert(hasSavedRouteSnapshot(savedRouteOrder()), "Saved route snapshot should be reusable for tracking details");
 
 assert(getRecommendations().length === 3, "Initial fallback recommendations should show 3 items");
-assert(getHomepageRestaurantRecommendations(filterCatalog).length === 3, "Initial homepage restaurant recommendations should show 3 items");
+const homepageCards = getHomepageRestaurantRecommendations(filterCatalog);
+assert(homepageCards.length === 3, "Initial homepage restaurant recommendations should show 3 items");
+assert(homepageCards.every((card) => card.badge === null), "Initial homepage recommendation card data should not include Best Match or AI Recommendation badges");
+assert(homepageCards.every((card) => !/\bpts\b/i.test(String(card.price))), "Initial homepage recommendation card data should not expose match score points");
 assert(searchRecommendations("pizza ramen burger healthy sushi falafel").length <= 6, "Search recommendations should allow up to 6 items");
+const searchCards = Array.from({ length: 6 }, (_, index) =>
+  toSearchRecommendationCardModel(
+    {
+      restaurantId: `restaurant-${index}`,
+      restaurantName: `Restaurant ${index}`,
+      recommendedItems: [`Matched Item ${index}`],
+      recommendationScore: 100 - index,
+      matchedFactors: ["query match"],
+      reason: "Matched against query.",
+    },
+    index,
+    "request-1",
+  ),
+);
+assert(searchCards.length === 6, "Search-triggered recommendation mode can show 6 items");
+assert(searchCards[0].badge.label === "Best Match", "Search result mode can show Best Match");
+assert(searchCards.slice(1).every((card) => card.badge.label === "AI Recommendation"), "Search result mode can show AI Recommendation labels");
+assert(searchCards.every((card) => /\bpts\b/.test(card.price)), "Search result mode can show match score points");
 
 const disallowedNamePattern = /\b(cheap|halal|halal-friendly|premium|gluten-free|gluten free|healthy|fast delivery|budget|budget-friendly)\b/i;
 const fallbackNames = recommendations.map((recommendation) => recommendation.title);

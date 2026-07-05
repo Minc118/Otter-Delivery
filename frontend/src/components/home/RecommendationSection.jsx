@@ -12,6 +12,7 @@ export default function RecommendationSection({
   const isServiceUnavailable = status === "unavailable";
   const sourceLabel = source === "hybrid" ? "Gemini rerank + fallback scoring" : source;
   const isHomepageCatalog = !activeQuery && source === "restaurant-service";
+  const cardMode = activeQuery ? "search" : "today";
 
   return (
     <section
@@ -59,6 +60,7 @@ export default function RecommendationSection({
           {recommendations.map((recommendation) => (
             <RecommendationCard
               key={recommendation.id}
+              mode={cardMode}
               recommendation={recommendation}
             />
           ))}
