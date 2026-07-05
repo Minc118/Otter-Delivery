@@ -84,3 +84,63 @@ export function toHistoryOrder(order) {
     createdAt: Number.isFinite(createdAt) ? createdAt : undefined,
   };
 }
+
+export function toLocalHistoryOrder(order) {
+  const itemSummary = (order.items ?? [])
+    .slice(0, 3)
+    .map((item) => {
+      const quantity = item.quantity ?? 1;
+      const name = normalizeMenuItemName(item.name ?? item.itemName ?? "Item");
+      return `${quantity}x ${name}`;
+    })
+    .join(", ");
+
+  return {
+    ...order,
+    customerId: order.customerId,
+    image: order.restaurantImage ?? order.image ?? {
+      alt: order.restaurantName ?? "Restaurant",
+      src: ORDER_HISTORY_FALLBACK_IMAGE,
+    },
+    itemsSummary: itemSummary || order.itemsSummary || "Order items",
+    placedAt: order.deliveredAt
+      ? "Delivered"
+      : order.createdAt
+        ? new Date(order.createdAt).toLocaleString()
+        : order.placedAt ?? "Recent order",
+    trackingPath: `/orders/${order.id}/tracking`,
+  };
+}
+
+export function mergeOrderHistory({
+  profileId,
+  serviceOrders = [],
+  trackedOrders = [],
+}) {
+  const normalizedProfileId = profileId == null ? null : String(profileId);
+  const localOrders = (trackedOrders ?? [])
+    .filter((order) => isOrderForProfile(order, normalizedProfileId))
+    .map(toLocalHistoryOrder);
+  const localById = new Map(localOrders.map((order) => [String(order.id), order]));
+  const merged = [
+    ...localOrders,
+    ...(serviceOrders ?? []).map((order) => {
+      const localOrder = localById.get(String(order.id));
+      return localOrder ? { ...order, ...localOrder } : order;
+    }).filter((order) => !localById.has(String(order.id))),
+  ];
+
+  return merged.sort((left, right) => orderSortTime(right) - orderSortTime(left));
+}
+
+export function isOrderForProfile(order, profileId) {
+  if (!profileId) {
+    return false;
+  }
+  const customerId = order?.customerId ?? order?.profileId ?? order?.userId;
+  return customerId != null && String(customerId) === String(profileId);
+}
+
+function orderSortTime(order) {
+  return Number(order?.deliveredAt ?? order?.trackingStartedAt ?? order?.createdAt ?? 0);
+}

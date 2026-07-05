@@ -60,12 +60,8 @@ export default function RestaurantDiscoveryPage() {
               filters={filters}
               onFilterChange={handleFilterChange}
           />
-          <div
-              aria-hidden="true"
-              className="pointer-events-none sticky top-[calc(6rem+2.5rem)] z-30 -mt-20 h-20 bg-gradient-to-b from-background via-background/95 to-transparent"
-          />
 
-          <div className="flex justify-between items-end -mt-4">
+          <div className="flex justify-between items-end">
             <h1 className="font-section-title text-section-title text-on-background">
               Explore Restaurants
             </h1>

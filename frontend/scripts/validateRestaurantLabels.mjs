@@ -21,10 +21,16 @@ import { recommendations } from "../src/data/recommendations.js";
 const filterBarSource = readFileSync(new URL("../src/components/discovery/FilterBar.jsx", import.meta.url), "utf8");
 const discoveryPageSource = readFileSync(new URL("../src/routes/RestaurantDiscoveryPage.jsx", import.meta.url), "utf8");
 const restaurantGridSource = readFileSync(new URL("../src/components/restaurant/RestaurantGrid.jsx", import.meta.url), "utf8");
-assert(filterBarSource.includes("bg-surface-container-lowest rounded-xl p-4 border border-surface-variant shadow-sm sticky top-24 z-40"), "Filter bar should keep the previous visual class shape");
-assert(!filterBarSource.includes("bg-gradient-to-b from-transparent"), "Filter bar should not own the scroll fade mask");
-assert(discoveryPageSource.includes("bg-gradient-to-b from-background via-background/95 to-transparent"), "Discovery page should fade cards out above the list as they enter the sticky filter");
+const menuItemCardSource = readFileSync(new URL("../src/components/restaurant/MenuItemCard.jsx", import.meta.url), "utf8");
+const restaurantAdapterSource = readFileSync(new URL("../src/services/restaurantAdapter.js", import.meta.url), "utf8");
+assert(filterBarSource.includes("bg-surface-container-lowest rounded-xl p-4 border border-surface-variant shadow-sm"), "Filter bar should keep its visual class shape");
+assert(!/\b(sticky|fixed|top-\d+|z-40)\b/.test(filterBarSource), "Filter bar should scroll in normal page flow");
+assert(!filterBarSource.includes("bg-gradient-to-b") && !filterBarSource.includes("mask"), "Filter bar should not own a fade or mask");
+assert(!discoveryPageSource.includes("bg-gradient-to-b from-background via-background/95 to-transparent"), "Discovery page should not add a sticky fade overlay for the filter bar");
+assert(!discoveryPageSource.includes("pointer-events-none sticky"), "Discovery page should not include a sticky overlay spacer");
 assert(restaurantGridSource.includes("showRibbon={false}"), "Discovery restaurant cards should hide AI Pick ribbons");
+assert(!menuItemCardSource.includes("AI Recommended"), "Normal menu item cards should not show AI Recommended badges");
+assert(!restaurantAdapterSource.includes("label: \"AI Pick\""), "Restaurant adapter should not synthesize AI Pick ribbons for normal browsing");
 
 const cases = [
   {
@@ -173,6 +179,7 @@ const allResults = filterRestaurants(filterCatalog, defaultRestaurantFilters);
 assert(allResults.length === filterCatalog.length, "All filters should return the full catalog");
 assert(getVisibleRestaurants(allResults, INITIAL_RESTAURANT_VISIBLE_COUNT).length === 9, "Initial visible count should be 9");
 assert(getVisibleRestaurants(italianResults, INITIAL_RESTAURANT_VISIBLE_COUNT).length === 1, "Filtered visible count should come from filtered results");
+assert(getVisibleRestaurants(italianResults, 18).length === italianResults.length, "Load More should operate on filtered results");
 
 const burgerResults = filterRestaurants(filterCatalog, {
   ...defaultRestaurantFilters,

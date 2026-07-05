@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.jsx";
 import {
   getProfile,
   isProfileServiceUnavailable,
 } from "../services/profileService.js";
-import { getCustomerOrderHistory } from "../services/orderHistoryService.js";
+import {
+  getCustomerOrderHistory,
+  mergeOrderHistory,
+} from "../services/orderHistoryService.js";
 import { searchLiveRestaurantRecommendations } from "../services/recommendationService.js";
 import { getRestaurantById } from "../services/catalogService.js";
 import ProfileSummary from "../components/profile/ProfileSummary.jsx";
@@ -50,6 +53,15 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
   const [activeSettingsSection, setActiveSettingsSection] = useState("account");
+  const profileId = profile?.id ? String(profile.id) : null;
+  const displayOrders = useMemo(
+    () => mergeOrderHistory({
+      profileId,
+      serviceOrders: orders,
+      trackedOrders,
+    }),
+    [orders, profileId, trackedOrders],
+  );
 
   useEffect(() => {
     document.title = "My Profile - Otter Delivery";
@@ -164,8 +176,8 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter">
             <ProfileSummary
                 activeSettingsSection={activeSettingsSection}
-                insight={`You have placed ${orders.length} order${
-                    orders.length === 1 ? "" : "s"
+                insight={`You have placed ${displayOrders.length} order${
+                    displayOrders.length === 1 ? "" : "s"
                 }.`}
                 onSettingsSectionChange={setActiveSettingsSection}
                 user={profileUser}
@@ -194,13 +206,13 @@ export default function ProfilePage() {
                       Order History
                     </h2>
 
-                    {orders.length === 0 ? (
+                    {displayOrders.length === 0 ? (
                         <p className="text-on-surface-variant">
                           You have no orders yet.
                         </p>
                     ) : (
                         <div className="space-y-4">
-                          {orders.map((order) => {
+                          {displayOrders.map((order) => {
                             const trackedOrder = trackedOrders.find(
                                 (tracked) => String(tracked.id) === String(order.id),
                             );
@@ -218,7 +230,7 @@ export default function ProfilePage() {
                                 >
                                   <div>
                                     <h3 className="font-bold text-on-surface">
-                                      {restaurantNames[order.restaurantId] ?? "Restaurant"}
+                                      {displayOrder.restaurantName ?? restaurantNames[order.restaurantId] ?? "Restaurant"}
                                     </h3>
 
                                     <p className="text-sm text-on-surface-variant">

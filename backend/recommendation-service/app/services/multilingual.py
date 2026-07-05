@@ -41,6 +41,35 @@ _ENGLISH_MARKERS = {
     "without",
 }
 
+_ENGLISH_LABELS = {
+    "beef": "beef",
+    "bowl": "bowl",
+    "burger": "burger",
+    "burrito": "burrito",
+    "chicken": "chicken",
+    "curry": "curry",
+    "doner": "doner",
+    "döner": "döner",
+    "falafel": "falafel",
+    "gluten-free": "gluten-free",
+    "halal": "halal",
+    "kebab": "kebab",
+    "noodle": "noodles",
+    "noodles": "noodles",
+    "pasta": "pasta",
+    "pho": "pho",
+    "pizza": "pizza",
+    "pork": "pork",
+    "ramen": "ramen",
+    "salad": "salad",
+    "spicy": "spicy",
+    "sushi": "sushi",
+    "turkish": "turkish",
+    "vegan": "vegan",
+    "vegetarian": "vegetarian",
+    "vietnamese": "vietnamese",
+}
+
 _GERMAN_LABELS = {
     "amerikanisch": "american",
     "asiatisch": "asian",
@@ -48,6 +77,8 @@ _GERMAN_LABELS = {
     "burger": "burger",
     "chinesisch": "chinese",
     "curry": "curry",
+    "doner": "doner",
+    "döner": "döner",
     "falafel": "falafel",
     "gesund": "healthy",
     "glutenfrei": "gluten-free",
@@ -56,6 +87,7 @@ _GERMAN_LABELS = {
     "italienisch": "italian",
     "japanisch": "japanese",
     "koreanisch": "korean",
+    "kebab": "kebab",
     "mediterran": "mediterranean",
     "mexikanisch": "mexican",
     "nudeln": "noodles",
@@ -283,17 +315,14 @@ def extract_canonical_labels(query: str, language: str) -> list[str]:
         for phrase, canonical in sorted(_CHINESE_LABELS.items(), key=lambda item: -len(item[0])):
             if phrase in lowered:
                 labels.append(canonical)
+        labels.extend(_english_labels_from_text(lowered))
     elif language == "de":
         for token in re.findall(r"[a-zA-ZÀ-ÿ-]+", lowered):
             canonical = _german_label(token)
             if canonical:
                 labels.append(canonical)
     else:
-        labels.extend(
-            token
-            for token in re.findall(r"[a-z0-9-]+", lowered)
-            if len(token) > 2
-        )
+        labels.extend(_english_labels_from_text(lowered, keep_unknown=True))
     return _unique(labels)
 
 
@@ -419,6 +448,15 @@ def _german_label(value: str) -> str | None:
         if value.startswith(stem):
             return canonical
     return None
+
+
+def _english_labels_from_text(value: str, keep_unknown: bool = False) -> list[str]:
+    labels: list[str] = []
+    for token in re.findall(r"[a-z0-9-]+", value):
+        if len(token) <= 2:
+            continue
+        labels.append(_ENGLISH_LABELS.get(token, token) if keep_unknown else _ENGLISH_LABELS.get(token))
+    return [label for label in labels if label]
 
 
 def _normalize_price_label(value: Any, language: str) -> str:

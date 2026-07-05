@@ -29,6 +29,7 @@ QUERY_SYNONYMS = {
     "burger": {"burger", "burgers", "american", "smash", "grill", "grills", "comfort"},
     "halal": {"halal", "halal-friendly"},
     "gluten": {"gluten", "gluten-free"},
+    "gluten-free": {"gluten-free", "gluten", "free"},
     "free": {"free", "gluten-free"},
     "comfort": {"comfort", "comforting", "warm"},
     "comforting": {"comfort", "comforting", "warm"},
@@ -313,7 +314,7 @@ def score_restaurants(
         if query_dishes:
             allowed_dish_terms = set()
             for dish in query_dishes:
-                allowed_dish_terms.update(QUERY_SYNONYMS.get(dish, {dish}))
+                allowed_dish_terms.update(_concrete_dish_terms(dish))
                 allowed_dish_terms.add(dish)
 
             # Check if restaurant or any of its items matches allowed dish terms
@@ -689,13 +690,19 @@ def _item_terms(item: FoodItem) -> set[str]:
 
 def _tokens(value: str) -> set[str]:
     normalized = value.lower()
-    for separator in ",.;:/()[]{}!?-_\n\t":
+    for separator in ",.;:/()[]{}!?_\n\t":
         normalized = normalized.replace(separator, " ")
-    return {
-        token
-        for token in normalized.split()
-        if len(token) > 2 or token in SHORT_FOOD_TOKENS
-    }
+    tokens: set[str] = set()
+    for token in normalized.split():
+        if len(token) > 2 or token in SHORT_FOOD_TOKENS:
+            tokens.add(token)
+        if "-" in token:
+            tokens.update(
+                part
+                for part in token.split("-")
+                if len(part) > 2 or part in SHORT_FOOD_TOKENS
+            )
+    return tokens
 
 
 def _expand_tokens(tokens: set[str]) -> set[str]:
@@ -703,6 +710,23 @@ def _expand_tokens(tokens: set[str]) -> set[str]:
     for token in list(tokens):
         expanded.update(QUERY_SYNONYMS.get(token, set()))
     return expanded
+
+
+def _concrete_dish_terms(dish: str) -> set[str]:
+    terms = set(QUERY_SYNONYMS.get(dish, {dish}))
+    if dish in {"noodle", "noodles"}:
+        return terms
+    if dish in {"kebab", "doner", "döner"}:
+        return terms - {"turkish"}
+    return terms - CUISINE_TERMS - {
+        "asian",
+        "eastern",
+        "grill",
+        "healthy",
+        "middle",
+        "noodle",
+        "noodles",
+    }
 
 
 def _lower_list(value: Any) -> set[str]:

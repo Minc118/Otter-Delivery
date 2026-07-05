@@ -9,6 +9,9 @@ class DishIntentScoringTests(unittest.TestCase):
     def test_falafel_query_ranks_falafel_items_above_generic_vegetarian_bowls(self) -> None:
         test_falafel_query_ranks_falafel_items_above_generic_vegetarian_bowls()
 
+    def test_chinese_mixed_falafel_query_keeps_english_dish_intent(self) -> None:
+        test_chinese_mixed_falafel_query_keeps_english_dish_intent()
+
     def test_vegan_falafel_query_keeps_dish_match_above_generic_vegan(self) -> None:
         test_vegan_falafel_query_keeps_dish_match_above_generic_vegan()
 
@@ -59,6 +62,20 @@ def test_falafel_query_ranks_falafel_items_above_generic_vegetarian_bowls() -> N
     assert any("Falafel" in item for item in results[0].recommended_items)
     assert _rank(results, "generic-vegan") > _rank(results, results[0].restaurant_id)
     assert _rank(results, "korean") > _rank(results, results[0].restaurant_id)
+
+
+def test_chinese_mixed_falafel_query_keeps_english_dish_intent() -> None:
+    normalized = normalize_recommendation_input(
+        query="我想吃 falafel",
+        preferences={},
+    )
+    assert normalized.canonical_query == "falafel"
+
+    results = _score_normalized(normalized.canonical_query, normalized.canonical_preferences)
+
+    assert results[0].restaurant_id in {"levant", "falafel-sprint"}
+    assert any("Falafel" in item for item in results[0].recommended_items)
+    assert _rank(results, "generic-vegan") > _rank(results, results[0].restaurant_id)
 
 
 def test_vegan_falafel_query_keeps_dish_match_above_generic_vegan() -> None:

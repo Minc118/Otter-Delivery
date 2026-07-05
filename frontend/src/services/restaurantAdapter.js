@@ -314,15 +314,7 @@ export function toRestaurantViewModel(rawRestaurant, options = {}) {
     open: rawRestaurant.open ?? rawRestaurant.available ?? true,
     featuredAction: rawRestaurant.featuredAction ?? true,
     mutedBody: rawRestaurant.mutedBody ?? hashString(name) % 4 === 0,
-    ribbon:
-      rawRestaurant.ribbon ??
-      (hashString(restaurantId) % 5 === 0
-        ? {
-            label: "AI Pick",
-            icon: "auto_awesome",
-            className: "bg-tertiary-fixed text-on-tertiary-fixed",
-          }
-        : null),
+    ribbon: rawRestaurant.ribbon ?? null,
     detail: {
       ...(rawRestaurant.detail ?? {}),
       name: rawRestaurant.detail?.name ?? name,
@@ -418,9 +410,9 @@ export function adaptRestaurants(rawRestaurants = []) {
 export function adaptMenuItems(rawItems = [], restaurant = null) {
   return rawItems
     .filter((item) => item.available ?? item.open ?? true)
-    .map((item, index) => ({
+    .map((item) => ({
       ...toMenuItemViewModel(item, restaurant),
-      aiRecommended: item.aiRecommended ?? index === 0,
+      aiRecommended: item.aiRecommended ?? false,
     }));
 }
 
