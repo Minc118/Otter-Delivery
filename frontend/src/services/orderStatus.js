@@ -120,11 +120,22 @@ export function getOrderStatusMeta(status, fallbackType = null) {
 }
 
 export function getLatestOrderStatusMeta(order) {
-  if (order?.deliveredAt || isDeliveredStatus(order?.status) || isDeliveredStatus(order?.trackingStatus)) {
+  const snapshot = order?.trackingSnapshot ?? {};
+  if (
+    order?.deliveredAt ||
+    snapshot.deliveredAt ||
+    isDeliveredStatus(order?.status) ||
+    isDeliveredStatus(order?.trackingStatus) ||
+    isDeliveredStatus(snapshot.latestStatus)
+  ) {
     return STATUS_MAP.delivered;
   }
 
-  const status = order?.trackingStatus ?? order?.assignmentStatus ?? order?.status;
+  const status =
+    order?.trackingStatus ??
+    snapshot.latestStatus ??
+    order?.assignmentStatus ??
+    order?.status;
   return getOrderStatusMeta(status, order?.statusType);
 }
 

@@ -2,7 +2,10 @@ package com.otterdelivery.restaurantservice.dto.response;
 
 import lombok.Data;
 
-import java.math.BigDecimal;@Data
+import java.math.BigDecimal;
+import java.util.List;
+
+@Data
 public class FoodItemResponseDTO {
 
     private Long id;
@@ -13,12 +16,14 @@ public class FoodItemResponseDTO {
     private int preparationTimeMinutes;
     private String imageUrl;
     private Long categoryId;
+    private String categoryName;
+    private List<String> tags;
 
 
     public FoodItemResponseDTO() {}
 
     public FoodItemResponseDTO(Long id, String name, String description, BigDecimal price, boolean available,
-                               int preparationTimeMinutes, String imageUrl, Long categoryId) {
+                               int preparationTimeMinutes, String imageUrl, Long categoryId, String categoryName, List<String> tags) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -27,6 +32,8 @@ public class FoodItemResponseDTO {
         this.preparationTimeMinutes = preparationTimeMinutes;
         this.imageUrl = imageUrl;
         this.categoryId = categoryId;
+        this.categoryName = categoryName;
+        this.tags = tags;
     }
 
 }

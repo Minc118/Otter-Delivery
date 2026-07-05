@@ -28,6 +28,23 @@ public class RestaurantMapper {
             );
         }
 
+        String cuisine = null;
+        java.util.List<String> tags = new java.util.ArrayList<>();
+        if (restaurant.getCategories() != null && !restaurant.getCategories().isEmpty()) {
+            cuisine = restaurant.getCategories().get(0).getName();
+            for (com.otterdelivery.restaurantservice.entity.Category cat : restaurant.getCategories()) {
+                tags.add(cat.getName());
+                if (cat.getDescription() != null) {
+                    for (String part : cat.getDescription().split(",")) {
+                        String trimmed = part.trim();
+                        if (!trimmed.isEmpty()) {
+                            tags.add(trimmed.toLowerCase());
+                        }
+                    }
+                }
+            }
+        }
+
         return new RestaurantResponseDTO(
             restaurant.getId(),
             restaurant.getName(),
@@ -38,7 +55,9 @@ public class RestaurantMapper {
             restaurant.getDeliveryRadiusKm(),
             restaurant.getOpeningTime(),
             restaurant.getClosingTime(),
-            addressDTO
+            addressDTO,
+            cuisine,
+            tags
         );
     }
 

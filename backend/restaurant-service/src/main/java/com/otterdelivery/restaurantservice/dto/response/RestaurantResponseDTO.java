@@ -3,6 +3,8 @@ package com.otterdelivery.restaurantservice.dto.response;
 import lombok.Data;
 
 import java.time.LocalTime;
+import java.util.List;
+
 @Data
 public class RestaurantResponseDTO {
 
@@ -16,12 +18,15 @@ public class RestaurantResponseDTO {
     private LocalTime openingTime;
     private LocalTime closingTime;
     private AddressDTO address;
+    private String cuisine;
+    private List<String> tags;
 
 
     public RestaurantResponseDTO() {}
 
     public RestaurantResponseDTO(Long id, String name, String description, String phoneNumber, String email, boolean open,
-                                 double deliveryRadiusKm, LocalTime openingTime, LocalTime closingTime, AddressDTO address) {
+                                 double deliveryRadiusKm, LocalTime openingTime, LocalTime closingTime, AddressDTO address,
+                                 String cuisine, List<String> tags) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -32,6 +37,8 @@ public class RestaurantResponseDTO {
         this.openingTime = openingTime;
         this.closingTime = closingTime;
         this.address = address;
+        this.cuisine = cuisine;
+        this.tags = tags;
     }
 
 }

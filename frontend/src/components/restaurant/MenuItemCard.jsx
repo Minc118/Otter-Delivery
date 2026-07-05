@@ -14,23 +14,11 @@ export default function MenuItemCard({ item, restaurant }) {
   const restaurantMeta = toRestaurantCartMeta(restaurant);
   const recommendationAttribution =
     getRecommendationAttributionForRestaurant(restaurantId);
-  const cardClass = item.aiRecommended
-    ? "bg-surface-light border border-surface-light"
-    : "bg-surface-container-lowest border border-surface hover:border-primary-light";
 
   return (
     <article
-      className={`${cardClass} rounded-xl overflow-hidden hover:shadow-[0_12px_32px_rgba(36,36,38,0.08)] transition-all duration-300 flex flex-col relative`}
+      className="bg-surface-container-lowest border border-surface hover:border-primary-light rounded-xl overflow-hidden hover:shadow-[0_12px_32px_rgba(36,36,38,0.08)] transition-all duration-300 flex flex-col relative"
     >
-      {item.aiRecommended ? (
-        <div className="absolute top-4 left-4 z-10 bg-[#FFD278] text-dark-text font-metadata text-metadata px-3 py-1 rounded-full flex items-center gap-1">
-          <span className="material-symbols-outlined text-[16px]">
-            auto_awesome
-          </span>
-          AI Recommended
-        </div>
-      ) : null}
-
       <div className="h-48 overflow-hidden">
         <img
           alt={item.image.alt}

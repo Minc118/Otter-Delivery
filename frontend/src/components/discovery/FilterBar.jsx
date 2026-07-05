@@ -56,7 +56,7 @@ const filterGroups = [
 
 export default function FilterBar({ filters, onFilterChange }) {
   return (
-    <section className="bg-surface-container-lowest rounded-xl p-4 border border-surface-variant shadow-sm sticky top-24 z-40">
+    <section className="bg-surface-container-lowest rounded-xl p-4 border border-surface-variant shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           {filterGroups.map((group) => (

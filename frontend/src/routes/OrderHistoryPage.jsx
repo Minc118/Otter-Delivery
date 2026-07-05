@@ -5,11 +5,11 @@ import OrderHistoryFilters from "../components/order-history/OrderHistoryFilters
 import PageShell from "../components/layout/PageShell.jsx";
 import {
   getCustomerOrderHistory,
+  mergeOrderHistory,
   OrderHistoryLoginRequiredError,
 } from "../services/orderHistoryService.js";
 import { getLatestOrderStatusMeta } from "../services/orderStatus.js";
 import useCart from "../hooks/useCart.js";
-import { normalizeMenuItemName } from "../services/restaurantAdapter.js";
 
 export default function OrderHistoryPage() {
   const [activeFilter, setActiveFilter] = useState("all");
@@ -19,14 +19,11 @@ export default function OrderHistoryPage() {
   const { trackedOrders } = useCart();
   const profile = readStoredProfile();
   const profileId = profile?.id ? String(profile.id) : null;
-  const localOrders = trackedOrders
-    .filter((order) => String(order.customerId ?? "") === String(profileId ?? ""))
-    .map(toLocalHistoryOrder);
-  const localOrderIds = new Set(localOrders.map((order) => String(order.id)));
-  const orders = [
-    ...localOrders,
-    ...ordersFromService.filter((order) => !localOrderIds.has(String(order.id))),
-  ].filter((order) =>
+  const orders = mergeOrderHistory({
+    profileId,
+    serviceOrders: ordersFromService,
+    trackedOrders,
+  }).filter((order) =>
     activeFilter === "all" ? true : getLatestOrderStatusMeta(order).type === activeFilter,
   );
 
@@ -131,31 +128,6 @@ export default function OrderHistoryPage() {
       </PageShell>
     </div>
   );
-}
-
-function toLocalHistoryOrder(order) {
-  const status = getLatestOrderStatusMeta(order);
-  const itemSummary = (order.items ?? [])
-    .slice(0, 3)
-    .map((item) => `${item.quantity ?? 1}x ${normalizeMenuItemName(item.name ?? item.itemName ?? "Item")}`)
-    .join(", ");
-
-  return {
-    ...order,
-    image: order.restaurantImage ?? {
-      alt: order.restaurantName ?? "Restaurant",
-      src: "",
-    },
-    itemsSummary: itemSummary || "Order items",
-    placedAt: order.deliveredAt
-      ? "Delivered"
-      : order.createdAt
-        ? new Date(order.createdAt).toLocaleString()
-        : "Recent order",
-    status: status.label,
-    statusType: status.type,
-    trackingPath: `/orders/${order.id}/tracking`,
-  };
 }
 
 function readStoredProfile() {
