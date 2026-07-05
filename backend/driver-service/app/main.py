@@ -1,4 +1,5 @@
 import psycopg
+import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,8 @@ from app.repositories.postgres_repository import PostgresDriverRepository
 from app.routes.drivers import router as drivers_router
 from app.routes.health import router as health_router
 from app.routes.tracking import router as tracking_router
+
+logger = logging.getLogger(__name__)
 
 FRONTEND_CORS_ORIGINS = [
     "http://localhost:5173",
@@ -68,10 +71,20 @@ def create_app(
 
 
 def _build_repository(settings: Settings) -> DriverRepository:
-    if settings.normalized_repository_mode == "memory":
+    mode = settings.normalized_repository_mode
+    if mode == "memory":
         return MemoryDriverRepository()
+    if mode == "postgres":
+        if not settings.effective_database_url:
+            raise RuntimeError(
+                "DRIVER_REPOSITORY_MODE requires DRIVER_DATABASE_URL or DATABASE_URL."
+            )
+        return PostgresDriverRepository(settings.effective_database_url)
     if settings.effective_database_url:
         return PostgresDriverRepository(settings.effective_database_url)
+    logger.warning(
+        "Driver Service started in memory repository mode because no database URL is configured."
+    )
     return MemoryDriverRepository()
 
 

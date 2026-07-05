@@ -1,18 +1,23 @@
 import { recommendations } from "../data/recommendations.js";
 
 const RECOMMENDATION_IMAGES = [
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCQFpQrYG4LpNRtVlfivKSl3ZheRPZ5TMzRJT2gGA-UHouXoQmZcStRnSpOVQszDPkN8009jor73icejL1cZ845YVJf8P-ZoJAuJ3T5tWezYTKuk-VktHr3e6ywT3zcwlEehA-dkaS7v00AIqTB8RJWtEbYjX6qttBqbL8ZZlGMr7e0f88hmQC2n4LVTOJ6wEEHXftC3-ACMXpj1y19K5tCY6OIKz1qb61vDasgGvJhhbAeEJRTRbaAw4fwDZf1k5iTgq0lzdlzYB8",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuA-lQs5K7n7zJdbm6-MaZ2qTx2e9H5HcTDpLbIabdp2Zick0JaCUH2ogRqK8NwT6mr10dydrKxTTHJsQFUpEjzVBnltTmYifLDYsb1KewsmEDp6s2xfRpZwDQb9v2rt4p-i97qDeDEzMpDWfdGGijyS6SIetuU5Gs_S-yQcZ0mc1Cby5GXUPKgEPMAujj9Ja7qkzGCuhU7Vnnk2MCp7ngLMxynpsOafPpV8_jmuOyLa8ToPEWtezpCmZtTPZYR9svmoIdZ9sESkWDA",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuD4tDnZ1-P6jHiJUhgAneI7osHNdC2c2IZ9_LhmRhOlQwahinAG5L3dpejECEFmiRYpDJIZLnYRDUH7cgjPKXaaz_7qO1WwpmDywFxoAJI59aZCvYn99jcdcWvvUr2M7JnvcU1JHgXc9nNgZ4n31fRHmpHW1NcY2j2zfrbW8s6QxPW-t9yNRaSynF_WGBNsmVaU6d7Mal5T8FRHnL2MQN9uCzXAW1l340UjDY_n4dkfM2Vq9GYNp3imoIqLQLTSm9rY3rXWwtBKwzs",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuB7kftjOB4DNU2AqzOvfQLUk8dnWple-b9SWyfJT2_mSGDBoinOnmrT0Z3MbBixnjYwP703r8ijxetBLdsTmSlNCruiv-FWY4evwZAYmap7EtG-F4lTw191PDDXKgvW2F22Goq44zL4FzQDYq_dteNeUoCQPVqTAciRXoADS_cQEApBnMIuMw8RQNMOrOUg7fIqSW4DiBxc8qoUDID7NKM6tefW89eIGPjiZ8c6bTP53dIPHkLmL7O0VsoqgB_pAiwae1M1NBXPfiU",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDIWhsPb7K0oWYUduk76iBbf-AdcjJjzzp1kABPhxBnb2Uk0DM13OcKszhC10G0HZ5krL7hGrp0srA_sCkJhZUxnKgbMVLLFyQ-0DoYBpjINiFpN5UnKq9yz0VcU-W3rD946CNTFBP-mvwq4Z96ZW5reS_kTas1cj-_8ladi4iaLYJx_yghxCrte-omzI3qWE13wRlI41f2irkkKO-3trOFqRZr6qTYj9KmeFBAUW88Rx8qxO8RUWkRgNUn-XBFMgPhtuCstsVeFR0",
+  "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80",
+  "https://images.pexels.com/photos/461198/pexels-photo-461198.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1200&q=80",
 ];
 
+const env = import.meta.env ?? {};
 const RECOMMENDATION_API_BASE_URL =
-  import.meta.env.VITE_RECOMMENDATION_SERVICE_URL ??
-  import.meta.env.VITE_RECOMMENDATION_API_URL ??
+  env.VITE_RECOMMENDATION_SERVICE_URL ??
+  env.VITE_RECOMMENDATION_API_URL ??
   "http://localhost:8004";
-const HOMEPAGE_RECOMMENDATION_LIMIT = 6;
+const HOMEPAGE_INITIAL_RECOMMENDATION_LIMIT = 3;
+const SEARCH_RECOMMENDATION_LIMIT = 6;
+const RECOMMENDATION_ATTRIBUTION_STORAGE_KEY = "otter-recommendation-attribution-v1";
 
 const SEARCH_STOP_WORDS = new Set([
   "and",
@@ -28,12 +33,12 @@ const SEARCH_STOP_WORDS = new Set([
 ]);
 
 export function getRecommendations() {
-  return recommendations.slice(0, HOMEPAGE_RECOMMENDATION_LIMIT);
+  return recommendations.slice(0, HOMEPAGE_INITIAL_RECOMMENDATION_LIMIT);
 }
 
 export function getHomepageRestaurantRecommendations(restaurants = []) {
   return restaurants
-    .slice(0, HOMEPAGE_RECOMMENDATION_LIMIT)
+    .slice(0, HOMEPAGE_INITIAL_RECOMMENDATION_LIMIT)
     .map((restaurant, index) => toRestaurantRecommendationCardModel(restaurant, index));
 }
 
@@ -73,7 +78,7 @@ export function searchRecommendations(query) {
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)
     .map(({ recommendation }) => recommendation)
-    .slice(0, HOMEPAGE_RECOMMENDATION_LIMIT);
+    .slice(0, SEARCH_RECOMMENDATION_LIMIT);
 }
 
 export async function getRestaurantRecommendations(payload) {
@@ -95,9 +100,10 @@ export async function getRestaurantRecommendations(payload) {
   return await response.json();
 }
 
-export async function searchLiveRestaurantRecommendations(query) {
+export async function searchLiveRestaurantRecommendations(query, options = {}) {
   const profile = getStoredProfile();
   const preferences = getProfileRecommendationPreferences(profile);
+  const limit = options.limit ?? SEARCH_RECOMMENDATION_LIMIT;
 
   const data = await getRestaurantRecommendations({
     userId: profile?.id ? String(profile.id) : "guest",
@@ -107,9 +113,10 @@ export async function searchLiveRestaurantRecommendations(query) {
 
   return {
     recommendations: (data.recommendations ?? [])
-      .slice(0, HOMEPAGE_RECOMMENDATION_LIMIT)
-      .map((item, index) => toRecommendationCardModel(item, index)),
+      .slice(0, limit)
+      .map((item, index) => toRecommendationCardModel(item, index, data.requestId)),
     source: data.source ?? "fallback",
+    requestId: data.requestId ?? null,
   };
 }
 
@@ -139,7 +146,7 @@ function toRestaurantRecommendationCardModel(restaurant, index) {
   };
 }
 
-function toRecommendationCardModel(item, index) {
+function toRecommendationCardModel(item, index, requestId = null) {
   const recommendedItems = item.recommendedItems ?? item.recommended_items ?? [];
   const title = recommendedItems[0] ?? item.restaurantName ?? item.restaurant_name;
   const restaurantId = item.restaurantId ?? item.restaurant_id;
@@ -162,10 +169,125 @@ function toRecommendationCardModel(item, index) {
     image: {
       alt: title,
       src: pickRecommendationImage(`${restaurantName}:${title}`),
+      fallbackSrc: RECOMMENDATION_IMAGES[0],
     },
     reason: item.reason ?? "Matched against the live restaurant catalog.",
     tags: matchedFactors.slice(0, 4),
+    recommendationRequestId: requestId,
+    recommendationRank: index + 1,
   };
+}
+
+export async function logRecommendationEvent({
+  requestId,
+  profileId,
+  restaurantId,
+  eventType,
+  orderId,
+  metadata = {},
+}) {
+  if (!eventType) {
+    return { stored: false };
+  }
+
+  try {
+    const response = await fetch(`${RECOMMENDATION_API_BASE_URL}/recommendations/events`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      keepalive: true,
+      body: JSON.stringify({
+        requestId: requestId ?? undefined,
+        profileId: profileId ?? undefined,
+        restaurantId: restaurantId ? String(restaurantId) : undefined,
+        eventType,
+        orderId: orderId ? String(orderId) : undefined,
+        metadata,
+      }),
+    });
+
+    if (!response.ok) {
+      return { stored: false };
+    }
+
+    return await response.json();
+  } catch {
+    return { stored: false };
+  }
+}
+
+export function logRecommendationShownEvents(recommendations, metadata = {}) {
+  const profile = getStoredProfile();
+  const events = (recommendations ?? [])
+    .filter((recommendation) => recommendation.recommendationRequestId)
+    .map((recommendation) =>
+      logRecommendationEvent({
+        requestId: recommendation.recommendationRequestId,
+        profileId: profile?.id ? String(profile.id) : "guest",
+        restaurantId: recommendation.restaurant?.id,
+        eventType: "shown",
+        metadata: {
+          ...metadata,
+          rank: recommendation.recommendationRank,
+          title: recommendation.title,
+        },
+      }),
+    );
+
+  if (events.length > 0) {
+    void Promise.allSettled(events);
+  }
+}
+
+export function rememberRecommendationAttribution(recommendation) {
+  if (!recommendation?.recommendationRequestId || !recommendation?.restaurant?.id) {
+    return;
+  }
+
+  const current = readRecommendationAttribution();
+  current[String(recommendation.restaurant.id)] = {
+    requestId: recommendation.recommendationRequestId,
+    restaurantId: String(recommendation.restaurant.id),
+    restaurantName: recommendation.restaurant.name,
+    rank: recommendation.recommendationRank,
+    title: recommendation.title,
+    clickedAt: new Date().toISOString(),
+  };
+  writeRecommendationAttribution(current);
+}
+
+export function getRecommendationAttributionForRestaurant(restaurantId) {
+  if (!restaurantId) {
+    return null;
+  }
+
+  return readRecommendationAttribution()[String(restaurantId)] ?? null;
+}
+
+function readRecommendationAttribution() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    return JSON.parse(
+      window.sessionStorage.getItem(RECOMMENDATION_ATTRIBUTION_STORAGE_KEY),
+    ) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function writeRecommendationAttribution(value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(
+    RECOMMENDATION_ATTRIBUTION_STORAGE_KEY,
+    JSON.stringify(value),
+  );
 }
 
 function getStoredProfile() {

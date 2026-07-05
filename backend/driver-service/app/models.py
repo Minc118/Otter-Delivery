@@ -72,6 +72,24 @@ class TrackingEvent(APIModel):
     created_at: datetime
 
 
+class TrackingSnapshot(APIModel):
+    snapshot_id: str
+    order_id: str
+    assignment_id: str | None = None
+    driver_id: str | None = None
+    status: AssignmentStatus | None = None
+    driver_location: Location | None = None
+    pickup_location: Location | None = None
+    dropoff_location: Location | None = None
+    route_estimate_id: str | None = None
+    route_provider: str | None = None
+    eta_seconds: int | None = None
+    route_points: list[Location] = Field(default_factory=list)
+    encoded_polyline: str | None = None
+    metadata: dict = Field(default_factory=dict)
+    created_at: datetime
+
+
 class RouteEstimate(APIModel):
     estimate_id: str
     order_id: str | None = None
@@ -136,6 +154,13 @@ class TrackingResponse(APIModel):
     order_id: str
     assignment: DeliveryAssignment | None = None
     events: list[TrackingEvent]
+    latest_snapshot: TrackingSnapshot | None = None
+    latest_route_estimate: RouteEstimate | None = None
+
+
+class UpdateTrackingStatusRequest(APIModel):
+    status: AssignmentStatus
+    message: str | None = Field(default=None, max_length=500)
 
 
 class HealthResponse(APIModel):

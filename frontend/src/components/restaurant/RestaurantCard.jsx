@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
+import { applyImageFallback } from "../../services/restaurantAdapter.js";
 
-export default function RestaurantCard({ restaurant }) {
+export default function RestaurantCard({ restaurant, showRibbon = true }) {
   const image = restaurant.image ?? { alt: restaurant.name, src: "" };
   const actionClass = "bg-primary-container hover:bg-surface-tint text-on-primary py-3";
 
   return (
     <article className="bg-surface-container-lowest rounded-xl border border-surface hover:border-primary-light transition-all duration-300 custom-shadow-hover overflow-hidden flex flex-col group relative">
-      {restaurant.ribbon ? (
+      {showRibbon && restaurant.ribbon ? (
         <div
           className={`absolute -top-1 -right-1 z-10 font-metadata text-metadata px-4 py-1 rounded-bl-xl rounded-tr-xl font-bold shadow-sm flex items-center gap-1 border border-surface-container-lowest ${restaurant.ribbon.className}`}
         >
@@ -21,6 +22,7 @@ export default function RestaurantCard({ restaurant }) {
         <img
           alt={image.alt}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          onError={(event) => applyImageFallback(event, image.fallbackSrc)}
           src={image.src}
         />
         <div className="absolute top-3 left-3 bg-surface-container-lowest text-on-surface font-metadata text-metadata px-3 py-1 rounded-full shadow-sm flex items-center gap-1">

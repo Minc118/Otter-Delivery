@@ -1,8 +1,10 @@
 import useCart from "../../hooks/useCart.js";
 import {
+  applyImageFallback,
   toCartItemViewModel,
   toRestaurantCartMeta,
 } from "../../services/restaurantAdapter.js";
+import { getRecommendationAttributionForRestaurant } from "../../services/recommendationService.js";
 
 export default function MenuItemCard({ item, restaurant }) {
   const { addItem } = useCart();
@@ -10,6 +12,8 @@ export default function MenuItemCard({ item, restaurant }) {
   const restaurantId =
     restaurant?.restaurantId ?? restaurant?.id ?? "green-bowl-house";
   const restaurantMeta = toRestaurantCartMeta(restaurant);
+  const recommendationAttribution =
+    getRecommendationAttributionForRestaurant(restaurantId);
   const cardClass = item.aiRecommended
     ? "bg-surface-light border border-surface-light"
     : "bg-surface-container-lowest border border-surface hover:border-primary-light";
@@ -31,6 +35,7 @@ export default function MenuItemCard({ item, restaurant }) {
         <img
           alt={item.image.alt}
           className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+          onError={(event) => applyImageFallback(event, item.image.fallbackSrc)}
           src={item.image.src}
         />
       </div>
@@ -54,6 +59,7 @@ export default function MenuItemCard({ item, restaurant }) {
               restaurantId,
               restaurantName,
               restaurantMeta,
+              recommendationAttribution,
               item: {
                 ...toCartItemViewModel(item),
                 restaurantId,

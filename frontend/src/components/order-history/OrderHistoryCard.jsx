@@ -1,7 +1,18 @@
 import { Link } from "react-router-dom";
 import { formatCurrency } from "../../utils/currency.js";
+import { getLatestOrderStatusMeta } from "../../services/orderStatus.js";
 
 const statusStyles = {
+  placed: {
+    card: "bg-surface-container-lowest border-primary-light/40 shadow-[0_4px_16px_rgba(36,36,38,0.04)] hover:shadow-stitch hover:border-primary-light",
+    badge: "bg-primary-container text-on-primary",
+    icon: "receipt_long",
+  },
+  preparing: {
+    card: "bg-surface-container-lowest border-primary-light/40 shadow-[0_4px_16px_rgba(36,36,38,0.04)] hover:shadow-stitch hover:border-primary-light",
+    badge: "bg-primary-container text-on-primary",
+    icon: "restaurant",
+  },
   completed: {
     card: "bg-surface-container-lowest border-primary-light/40 shadow-[0_4px_16px_rgba(36,36,38,0.04)] hover:shadow-stitch hover:border-primary-light",
     badge:
@@ -22,9 +33,11 @@ const statusStyles = {
 };
 
 export default function OrderHistoryCard({ order }) {
-  const styles = statusStyles[order.statusType] ?? statusStyles.completed;
-  const isCancelled = order.statusType === "cancelled";
-  const isActive = order.statusType === "on-the-way";
+  const status = getLatestOrderStatusMeta(order);
+  const styles = statusStyles[status.type] ?? statusStyles.completed;
+  const isCancelled = status.type === "cancelled";
+  const isActive = status.type === "on-the-way";
+  const trackingPath = order.trackingPath ?? (isActive ? `/orders/${order.id}/tracking` : "/orders");
 
   return (
     <article
@@ -58,7 +71,7 @@ export default function OrderHistoryCard({ order }) {
           <span className="material-symbols-outlined text-[16px]">
             {styles.icon}
           </span>
-          {order.status}
+          {status.label}
         </span>
       </div>
 
@@ -99,23 +112,23 @@ export default function OrderHistoryCard({ order }) {
           {isActive ? (
             <Link
               className="px-4 py-2 rounded-lg bg-surface-container-lowest text-primary font-button text-button shadow-sm hover:bg-surface-container transition-colors cursor-pointer active:scale-95 duration-200"
-              to={order.trackingPath}
+              to={trackingPath}
             >
               Track Order
             </Link>
           ) : (
-            <button
+            <Link
               className={
                 isCancelled
                   ? "px-4 py-2 rounded-lg bg-surface border border-outline-variant text-on-surface-variant font-button text-button hover:bg-surface-container transition-colors cursor-pointer active:scale-95 duration-200"
                   : "px-4 py-2 rounded-lg bg-transparent border border-primary-container text-primary-container font-button text-button hover:bg-surface transition-colors cursor-pointer active:scale-95 duration-200"
               }
-              type="button"
+              to={trackingPath}
             >
               View details
-            </button>
+            </Link>
           )}
-          {order.statusType === "completed" ? (
+          {status.type === "completed" ? (
             <button
               className="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-button text-button hover:bg-secondary transition-colors cursor-pointer active:scale-95 duration-200"
               type="button"

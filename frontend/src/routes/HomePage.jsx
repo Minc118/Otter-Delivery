@@ -4,6 +4,7 @@ import RecommendationSection from "../components/home/RecommendationSection.jsx"
 import { getRestaurants } from "../services/catalogService.js";
 import {
   getHomepageRestaurantRecommendations,
+  logRecommendationShownEvents,
   searchRecommendations,
   searchLiveRestaurantRecommendations,
 } from "../services/recommendationService.js";
@@ -37,7 +38,7 @@ export default function HomePage() {
       );
 
       try {
-        const ranked = await searchLiveRestaurantRecommendations();
+        const ranked = await searchLiveRestaurantRecommendations(undefined, { limit: 3 });
         const rankedIds = new Set();
         const rankedRecommendations = ranked.recommendations.filter((recommendation) => {
           const restaurantId = String(recommendation.restaurant.id);
@@ -53,9 +54,13 @@ export default function HomePage() {
         const homepageRecommendations = [
           ...rankedRecommendations,
           ...fillRecommendations,
-        ].slice(0, 6);
+        ].slice(0, 3);
 
         setRecommendations(homepageRecommendations);
+        logRecommendationShownEvents(homepageRecommendations, {
+          surface: "homepage",
+          source: ranked.source,
+        });
         setRecommendationSource(ranked.source);
         setStatus(homepageRecommendations.length > 0 ? "success" : "empty");
       } catch {
@@ -86,6 +91,11 @@ export default function HomePage() {
     try {
       const result = await searchLiveRestaurantRecommendations(trimmedQuery);
       setRecommendations(result.recommendations);
+      logRecommendationShownEvents(result.recommendations, {
+        surface: "homepage_search",
+        query: trimmedQuery,
+        source: result.source,
+      });
       setRecommendationSource(result.source);
       setStatus(result.recommendations.length > 0 ? "success" : "empty");
     } catch (searchError) {

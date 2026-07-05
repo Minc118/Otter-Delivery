@@ -63,8 +63,30 @@ class RestaurantRecommendationItem(ApiModel):
 
 
 class RestaurantRecommendationResponse(ApiModel):
+    request_id: UUID | str | None = None
     recommendations: list[RestaurantRecommendationItem]
     source: Literal["llm", "fallback", "hybrid"]
+
+
+class RecommendationEventCreate(ApiModel):
+    request_id: UUID | str | None = None
+    profile_id: str | None = Field(default=None, min_length=1, max_length=128)
+    user_id: str | None = Field(default=None, min_length=1, max_length=128)
+    restaurant_id: str | None = Field(default=None, max_length=128)
+    event_type: Literal["shown", "click", "order"]
+    order_id: str | None = Field(default=None, max_length=128)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def copy_legacy_user_id(self) -> "RecommendationEventCreate":
+        if self.profile_id is None and self.user_id is not None:
+            self.profile_id = self.user_id
+        return self
+
+
+class RecommendationEventResponse(ApiModel):
+    id: UUID | str
+    stored: bool
 
 
 class FeedbackCreateRequest(ApiModel):
@@ -138,6 +160,7 @@ class RecommendationRequestRecord(ApiModel):
     free_text: str | None
     request_preferences: dict[str, Any]
     stored_preferences: dict[str, Any]
+    normalized_intent: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     results: list[RecommendationItem]
 

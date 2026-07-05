@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx
 
-from app.config import Settings
+if TYPE_CHECKING:
+    from app.config import Settings
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,7 @@ class RestaurantCatalogClient(Protocol):
 
 
 class HttpRestaurantCatalogClient:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: "Settings"):
         self.base_url = settings.restaurant_service_url.rstrip("/")
         self.timeout = settings.restaurant_service_timeout_seconds
         self.used_fallback = False

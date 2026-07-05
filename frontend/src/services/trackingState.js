@@ -4,7 +4,7 @@ import {
   normalizeRoutePoint,
 } from "./routeGeometry.js";
 
-const DELIVERED_STORAGE_GRACE_PERIOD_MS = 15 * 60 * 1000;
+const DELIVERED_STORAGE_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 const PENDING_STORAGE_GRACE_PERIOD_MS = 2 * 60 * 60 * 1000;
 const RECENT_ACTIVE_ORDER_GRACE_PERIOD_MS = 15 * 60 * 1000;
 
@@ -83,16 +83,17 @@ export function getTrackedDeliveryOrders(orders) {
 }
 
 function getLocalTrackedDeliveryOrder(order) {
+  const snapshot = order?.trackingSnapshot ?? {};
   const id = normalizeId(order?.id ?? order?.orderId);
   const assignmentStatus = normalizeAssignmentStatus(order?.assignmentStatus);
-  const pickupLocation = normalizeRoutePoint(order?.pickupLocation);
+  const pickupLocation = normalizeRoutePoint(order?.pickupLocation ?? snapshot.pickupLocation);
   const deliveryLocation = normalizeRoutePoint(
-    order?.deliveryLocation ?? toDeliveryLocation(order?.deliveryAddress),
+    order?.deliveryLocation ?? snapshot.deliveryLocation ?? toDeliveryLocation(order?.deliveryAddress),
   );
   const routePoints = getRoutePoints({
     pickupLocation,
     deliveryLocation,
-    routePoints: order?.routePoints,
+    routePoints: order?.routePoints ?? snapshot.routePoints,
   });
 
   if (!id || !assignmentStatus) {
