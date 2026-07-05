@@ -21,6 +21,10 @@ const profileServiceSource = readFileSync(
   new URL("../src/services/profileService.js", import.meta.url),
   "utf8",
 );
+const orderServiceSource = readFileSync(
+  new URL("../src/services/orderService.js", import.meta.url),
+  "utf8",
+);
 
 assert(
   cartContextSource.includes("customerId: profile.id"),
@@ -123,6 +127,97 @@ const delivered = mergeOrderHistory({
   trackedOrders: [{ ...localTrackedOrder, deliveredAt: Date.now(), trackingStatus: "DELIVERED" }],
 })[0];
 assert(getLatestOrderStatusMeta(delivered).label === "Delivered", "Delivered local state should override stale CREATED.");
+
+const trackingPageSource = readFileSync(
+  new URL("../src/routes/OrderTrackingPage.jsx", import.meta.url),
+  "utf8",
+);
+assert(
+  trackingPageSource.includes("isOrderNotFound"),
+  "OrderTrackingPage must handle order not found fallback when the order is not in static or local tracked lists.",
+);
+assert(
+  trackingPageSource.includes("isTrackingNotFoundError"),
+  "OrderTrackingPage must detect tracking not found errors and mark them unavailable.",
+);
+assert(
+  orderServiceSource.includes("?? null") &&
+    !orderServiceSource.includes("orders[0]"),
+  "Static order lookup must not silently fall back to the first demo order for missing route ids.",
+);
+assert(
+  trackingPageSource.includes("const isNumericRouteId = isNumericOrderId(id);") &&
+    trackingPageSource.includes("const staticFallbackOrder = isNumericRouteId ? null : getOrderById(id);") &&
+    trackingPageSource.includes("const isOrderNotFound = !storedOrder && !staticFallbackOrder;"),
+  "OrderTrackingPage must prevent static/mock fallback for concrete numeric /orders/:id/tracking routes.",
+);
+assert(
+  trackingPageSource.includes("liveTrackingMissing") &&
+    trackingPageSource.includes("setTrackingUnavailableOrderIds") &&
+    trackingPageSource.includes("isTrackingUnavailable: trackingUnavailable"),
+  "OrderTrackingPage must keep a route-local TRACKING_NOT_FOUND override after local/static fallback data is merged.",
+);
+assert(
+  trackingPageSource.includes("trackingStatus: isUnavailable") &&
+    trackingPageSource.includes('? "tracking_unavailable"'),
+  "TRACKING_NOT_FOUND must force the display order into tracking_unavailable.",
+);
+assert(
+  trackingPageSource.includes('estimatedArrival:\n      isUnavailable\n        ? "Unavailable"'),
+  "OrderTrackingPage must show ETA as Unavailable for tracking_unavailable orders."
+);
+assert(
+  trackingPageSource.includes('driverLocation:\n      isUnavailable\n        ? null'),
+  "OrderTrackingPage must set driverLocation to null to prevent driver marker from displaying on the map."
+);
+assert(
+  trackingPageSource.includes("const canShowRouteMap = !trackingUnavailable && hasRouteMap(order);") &&
+    trackingPageSource.includes("trackingUnavailable ? (\n              <PendingTrackingPanel order={order} />"),
+  "OrderTrackingPage must render only the unavailable panel and suppress active map rendering for tracking_unavailable orders."
+);
+assert(
+  trackingPageSource.includes("rider: assignedDriverName ? { name: assignedDriverName } : null") &&
+    trackingPageSource.includes("phase: isUnavailable ? null"),
+  "OrderTrackingPage must not keep active rider or live driver phase fields after TRACKING_NOT_FOUND."
+);
+assert(
+  trackingPageSource.includes("staticFallbackOrder") &&
+    trackingPageSource.includes("isTrackingUnavailable: trackingUnavailable") &&
+    trackingPageSource.includes("const isUnavailable =\n    isTrackingUnavailable"),
+  "Static/mock order fallback must be overridden by tracking_unavailable after TRACKING_NOT_FOUND."
+);
+assert(
+  trackingPageSource.includes("storedOrder?.assignmentStatus === \"assigned\"") &&
+    trackingPageSource.includes("storedOrder.trackingStartedAt") &&
+    trackingPageSource.includes("getTrackingOrder({"),
+  "New tracked checkout orders must still be eligible for live backend tracking and display.",
+);
+assert(
+  trackingPageSource.includes("shouldRequestBackendTracking(storedOrder, liveTrackingMissing)") &&
+    trackingPageSource.includes("!liveTrackingMissing") &&
+    trackingPageSource.includes('storedOrder?.trackingStatus !== "tracking_unavailable"'),
+  "OrderTrackingPage must stop backend tracking requests after tracking_unavailable is applied."
+);
+
+assert(
+  cartContextSource.includes('trackingStatus: "tracking_unavailable"') &&
+    cartContextSource.includes('assignmentStatus: "tracking_unavailable"'),
+  "CartContext must persist tracking_unavailable status in local tracked orders when tracking is lost."
+);
+
+const simulationSource = readFileSync(
+  new URL("../src/hooks/useDeliverySimulation.js", import.meta.url),
+  "utf8",
+);
+assert(
+  simulationSource.includes('order?.trackingStatus === "tracking_unavailable"'),
+  "useDeliverySimulation must stop local delivery simulation for tracking_unavailable orders."
+);
+assert(
+  simulationSource.includes("disabled = false") &&
+    simulationSource.includes("order && startedAt && !isTrackingUnavailable"),
+  "useDeliverySimulation must support an explicit disabled state for local TRACKING_NOT_FOUND overrides."
+);
 
 console.log("Validated checkout customerId wiring, order-service history loading, merged local/service history, profile order source, route links, status override, and order adapter output.");
 

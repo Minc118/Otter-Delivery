@@ -304,7 +304,17 @@ export function CartProvider({ children }) {
       }
 
       if (currentOrder.trackingSnapshot || currentOrder.routeEstimate) {
-        return currentOrders;
+        const updatedOrder = {
+          ...currentOrder,
+          trackingStatus: "tracking_unavailable",
+          assignmentStatus: "tracking_unavailable",
+        };
+        const nextOrders = {
+          ...currentOrders,
+          [normalizedId]: updatedOrder,
+        };
+        storeValue(TRACKED_ORDERS_STORAGE_KEY, nextOrders);
+        return nextOrders;
       }
 
       const nextOrders = { ...currentOrders };

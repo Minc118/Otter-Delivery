@@ -101,6 +101,12 @@ const STATUS_MAP = {
     title: "We are still assigning a driver",
     text: "Driver assignment temporarily unavailable",
   },
+  tracking_unavailable: {
+    label: "Tracking unavailable",
+    type: "cancelled",
+    title: "Tracking unavailable",
+    text: "Live tracking is no longer active",
+  },
 };
 
 export function getOrderStatusMeta(status, fallbackType = null) {

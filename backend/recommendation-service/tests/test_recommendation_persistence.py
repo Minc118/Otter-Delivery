@@ -215,6 +215,35 @@ class RecommendationPersistenceTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"id": str(event_id), "stored": True})
 
+    def test_recommendation_event_endpoint_accepts_order_event_payload(self) -> None:
+        event_id = uuid4()
+        app.dependency_overrides[get_db] = lambda: EmptyDb()
+        app.dependency_overrides[get_settings] = lambda: self.settings
+        try:
+            with patch(
+                "app.services.recommendation_service.recommendation_repository.create_recommendation_event",
+                return_value=SimpleNamespace(id=event_id),
+            ):
+                response = TestClient(app).post(
+                    "/recommendations/events",
+                    json={
+                        "requestId": "a5054968-ea3c-43a0-8b94-fee96ccf886f",
+                        "profileId": "2",
+                        "restaurantId": "5",
+                        "eventType": "order",
+                        "orderId": "1",
+                        "metadata": {
+                            "itemCount": 2,
+                            "totalPrice": 23.8
+                        }
+                    },
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"id": str(event_id), "stored": True})
+
 
 if __name__ == "__main__":
     unittest.main()
