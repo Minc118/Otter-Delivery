@@ -14,12 +14,14 @@ const SIMULATION_STORAGE_PREFIX = "otter-delivery-simulation:";
 
 export default function useDeliverySimulation(
   order,
-  { tickIntervalMs = 500 } = {},
+  { disabled = false, tickIntervalMs = 500 } = {},
 ) {
+  const isTrackingUnavailable =
+    disabled || order?.trackingStatus === "tracking_unavailable";
   const orderId = order?.id == null ? null : String(order.id);
   const routePoints = useMemo(
     () =>
-      orderId
+      orderId && !isTrackingUnavailable
         ? getRoutePoints({
             routePoints: order?.routePoints,
             encodedPolyline: order?.encodedPolyline,
@@ -28,6 +30,7 @@ export default function useDeliverySimulation(
           })
         : [],
     [
+      isTrackingUnavailable,
       orderId,
       order?.routePoints,
       order?.encodedPolyline,
@@ -44,7 +47,7 @@ export default function useDeliverySimulation(
   const [now, setNow] = useState(() => Date.now());
 
   const simulation =
-    order && startedAt
+    order && startedAt && !isTrackingUnavailable
       ? createSimulationSnapshot({
           now,
           order,

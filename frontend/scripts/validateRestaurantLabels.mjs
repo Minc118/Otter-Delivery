@@ -18,6 +18,12 @@ import {
   toSearchRecommendationCardModel,
 } from "../src/services/recommendationService.js";
 import { recommendations } from "../src/data/recommendations.js";
+import {
+  getTrackedDeliveryOrder,
+  getTrackedDeliveryOrders,
+  sanitizeTrackedOrdersById,
+  isRecentActiveTrackedOrder,
+} from "../src/services/trackingState.js";
 
 const filterBarSource = readFileSync(new URL("../src/components/discovery/FilterBar.jsx", import.meta.url), "utf8");
 const discoveryPageSource = readFileSync(new URL("../src/routes/RestaurantDiscoveryPage.jsx", import.meta.url), "utf8");
@@ -246,7 +252,115 @@ assert(
 assert(normalizeMenuItemName("Halal Chicken Döner Plate") === "Chicken Döner Plate", "Known backend legacy names should be normalized before display");
 assert(normalizeMenuItemName("Premium Sushi Box") === "Sushi Selection", "Known premium metadata names should be normalized before display");
 
-console.log(`Validated ${cases.length} label cases, ${filterCatalog.length} filter fixtures, status/snapshot mapping, recommendation counts, discovery badges, and fallback menu names.`);
+// --- Advanced filter tests ---
+const cheapFilter = filterRestaurants(filterCatalog, {
+  ...defaultRestaurantFilters,
+  price: "under-10",
+});
+assert(cheapFilter.every(r => r.priceTier === "€"), "under-10 filter should return only € price tier");
+
+const midFilter = filterRestaurants(filterCatalog, {
+  ...defaultRestaurantFilters,
+  price: "10-25",
+});
+assert(midFilter.every(r => r.priceTier === "€€"), "10-25 filter should return only €€ price tier");
+
+const expensiveFilter = filterRestaurants(filterCatalog, {
+  ...defaultRestaurantFilters,
+  price: "over-25",
+});
+assert(expensiveFilter.every(r => r.priceTier === "€€€"), "over-25 filter should return only €€€ price tier");
+
+const fastDeliveryFilter = filterRestaurants(filterCatalog, {
+  ...defaultRestaurantFilters,
+  delivery: "under-40",
+});
+assert(fastDeliveryFilter.every(r => {
+  const min = parseInt(r.eta);
+  return min <= 40;
+}), "delivery filter under-40 should return only etas <= 40 minutes");
+
+const ratingFilter = filterRestaurants(filterCatalog, {
+  ...defaultRestaurantFilters,
+  rating: "4.7",
+});
+assert(ratingFilter.every(r => parseFloat(r.rating) >= 4.7), "rating filter 4.7 should return only ratings >= 4.7");
+
+const sortedByRating = filterRestaurants(filterCatalog, {
+  ...defaultRestaurantFilters,
+  sort: "rating",
+});
+for (let i = 0; i < sortedByRating.length - 1; i++) {
+  assert(parseFloat(sortedByRating[i].rating) >= parseFloat(sortedByRating[i+1].rating), "Rating sort should order descending");
+}
+
+const sortedByDelivery = filterRestaurants(filterCatalog, {
+  ...defaultRestaurantFilters,
+  sort: "delivery",
+});
+for (let i = 0; i < sortedByDelivery.length - 1; i++) {
+  assert(parseInt(sortedByDelivery[i].eta) <= parseInt(sortedByDelivery[i+1].eta), "Delivery sort should order ascending");
+}
+
+// --- trackingState.js coverage tests ---
+const validOrderForTracking = {
+  id: "order-123",
+  trackingStartedAt: Date.now() - 5000,
+  assignmentStatus: "assigned",
+  assignment: { orderId: "order-123" },
+  pickupLocation: { latitude: 52.52, longitude: 13.40 },
+  deliveryAddress: { latitude: 52.53, longitude: 13.41 },
+  routeEstimate: {
+    originLocation: { latitude: 52.52, longitude: 13.40 },
+    destinationLocation: { latitude: 52.53, longitude: 13.41 },
+    durationSeconds: 900,
+    routePoints: [
+      { latitude: 52.52, longitude: 13.40 },
+      { latitude: 52.53, longitude: 13.41 }
+    ]
+  }
+};
+
+const tracked = getTrackedDeliveryOrder(validOrderForTracking);
+assert(tracked !== null, "getTrackedDeliveryOrder should succeed for valid trackable order");
+assert(tracked.id === "order-123", "tracked ID should be order-123");
+assert(tracked.routePoints.length === 2, "tracked route points should be parsed");
+
+// Fallback to trackingSnapshot
+const legacyOrderWithSnapshot = {
+  id: "order-456",
+  assignmentStatus: "assigned",
+  trackingSnapshot: {
+    pickupLocation: { latitude: 52.52, longitude: 13.40 },
+    deliveryLocation: { latitude: 52.53, longitude: 13.41 },
+    routePoints: [
+      { latitude: 52.52, longitude: 13.40 },
+      { latitude: 52.53, longitude: 13.41 }
+    ]
+  }
+};
+const trackedSnapshotList = getTrackedDeliveryOrders([legacyOrderWithSnapshot]);
+assert(trackedSnapshotList.length === 1, "getTrackedDeliveryOrders should fall back to trackingSnapshot data");
+assert(trackedSnapshotList[0].simulationOrder.id === "order-456", "tracked snapshot ID should be order-456");
+
+// Sanitize tracked orders
+const rawOrders = {
+  "order-123": { id: "order-123", assignmentStatus: "assigned", trackingStartedAt: Date.now(), assignedDriver: {} },
+  "invalid-order": { id: "invalid-order", assignmentStatus: "invalid-status" }
+};
+const sanitized = sanitizeTrackedOrdersById(rawOrders, "order-123");
+assert(sanitized["order-123"] !== undefined, "sanitizeTrackedOrdersById should retain valid order");
+assert(sanitized["invalid-order"] === undefined, "sanitizeTrackedOrdersById should filter out invalid assignment status");
+
+// Recent active tracked order
+const now = Date.now();
+const recentOrder = { id: "order-789", createdAt: now - 1000 };
+const staleOrder = { id: "order-789", createdAt: now - 20 * 60 * 1000 };
+assert(isRecentActiveTrackedOrder(recentOrder, "order-789", now) === true, "Order within grace period should be recent active");
+assert(isRecentActiveTrackedOrder(staleOrder, "order-789", now) === false, "Order older than 15 minutes should not be active");
+
+console.log(`Validated ${cases.length} label cases, ${filterCatalog.length} filter fixtures, status/snapshot mapping, advanced filters and sorting, trackingState, recommendation counts, discovery badges, and fallback menu names.`);
+
 
 function item(name, description) {
   return { name, description, available: true, price: 10.9 };

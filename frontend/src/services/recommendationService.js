@@ -195,11 +195,11 @@ export async function logRecommendationEvent({
       },
       keepalive: true,
       body: JSON.stringify({
-        requestId: requestId ?? undefined,
-        profileId: profileId ?? undefined,
-        restaurantId: restaurantId ? String(restaurantId) : undefined,
+        requestId: requestId != null && requestId !== "" ? String(requestId) : undefined,
+        profileId: profileId != null && profileId !== "" ? String(profileId) : undefined,
+        restaurantId: restaurantId != null && restaurantId !== "" ? String(restaurantId) : undefined,
         eventType,
-        orderId: orderId ? String(orderId) : undefined,
+        orderId: orderId != null && orderId !== "" ? String(orderId) : undefined,
         metadata,
       }),
     });
