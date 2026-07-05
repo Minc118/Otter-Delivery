@@ -26,7 +26,7 @@ QUERY_SYNONYMS = {
     "kebab": {"kebab", "doner", "döner", "turkish", "grill"},
     "pizza": {"pizza", "italian", "margherita"},
     "pasta": {"pasta", "italian"},
-    "burger": {"burger", "burgers", "american", "smash"},
+    "burger": {"burger", "burgers", "american", "smash", "grill", "grills", "comfort"},
     "halal": {"halal", "halal-friendly"},
     "gluten": {"gluten", "gluten-free"},
     "free": {"free", "gluten-free"},
@@ -43,7 +43,7 @@ QUERY_SYNONYMS = {
     "bo": {"bo", "bò", "beef"},
     "bò": {"bò", "bo", "beef"},
     "ramen": {"ramen", "noodle", "noodles", "japanese"},
-    "sushi": {"sushi", "japanese", "maki", "nigiri", "sashimi"},
+    "sushi": {"sushi", "japanese", "maki", "nigiri", "sashimi", "asian"},
     "noodle": {"noodle", "noodles", "ramen"},
     "noodles": {"noodle", "noodles", "ramen"},
     "bibimbap": {"bibimbap", "korean", "bowl"},
@@ -116,6 +116,9 @@ HIGH_INTENT_TERMS = CONCRETE_DISH_TERMS | INGREDIENT_TERMS | CUISINE_TERMS
 
 
 SHORT_FOOD_TOKENS = {"bo", "bò"}
+
+ASIAN_CUISINES = {"japanese", "chinese", "korean", "thai", "vietnamese", "indian", "asian", "pho", "ramen", "sushi", "noodles"}
+WESTERN_CUISINES = {"american", "italian", "mexican", "turkish", "mediterranean", "middle eastern", "burger", "pizza"}
 
 
 PRICE_RANGES = {
@@ -210,6 +213,8 @@ def score_restaurants(
     history_by_restaurant = history_by_restaurant or {}
     raw_query_tokens = _tokens(query or "")
     query_tokens = _expand_tokens(raw_query_tokens)
+    is_query_asian = any(tok in ASIAN_CUISINES for tok in raw_query_tokens)
+    is_query_western = any(tok in WESTERN_CUISINES for tok in raw_query_tokens)
     dietary = _lower_list(_first_present(preferences, "dietary", "dietary_preferences", "dietaryPreferences"))
     allergies = _lower_list(_first_present(preferences, "allergies", "allergens"))
     disliked_ingredients = _lower_list(
@@ -265,6 +270,63 @@ def score_restaurants(
         score += query_score
         matched_factors.extend(query_matches)
         negative_factors.extend(query_negatives)
+
+        # Structured metadata matches
+        structured_cuisine = (restaurant.cuisine or "").lower()
+        structured_restaurant_tags = {t.lower() for t in restaurant.tags} if restaurant.tags else set()
+        tokenized_cuisine = _tokens(structured_cuisine)
+        tokenized_restaurant_tags = {tok for tag in structured_restaurant_tags for tok in _tokens(tag)}
+
+        # Region fallback boost
+        is_candidate_asian = any(c in structured_cuisine for c in ASIAN_CUISINES)
+        is_candidate_western = any(c in structured_cuisine for c in WESTERN_CUISINES)
+        region_boost = 0.0
+        if is_query_asian and is_candidate_asian:
+            region_boost = 2.0
+            matched_factors.append("region match")
+        elif is_query_western and is_candidate_western:
+            region_boost = 2.0
+            matched_factors.append("region match")
+        score += region_boost
+
+        cuisine_struct_score = 0
+        cuisine_matches = raw_query_tokens.intersection(tokenized_cuisine)
+        if cuisine_matches:
+            cuisine_struct_score += 35
+            matched_factors.extend([f"structured cuisine {m}" for m in sorted(cuisine_matches)])
+        else:
+            cuisine_syn_matches = query_tokens.intersection(tokenized_cuisine)
+            if cuisine_syn_matches:
+                cuisine_struct_score += 15
+                matched_factors.extend([f"structured cuisine related {m}" for m in sorted(cuisine_syn_matches)])
+        score += cuisine_struct_score
+
+        tag_struct_score = 0
+        tag_matches = raw_query_tokens.intersection(tokenized_restaurant_tags)
+        if tag_matches:
+            tag_struct_score += min(30, 15 * len(tag_matches))
+            matched_factors.extend([f"structured tag {t}" for t in sorted(tag_matches)])
+        score += tag_struct_score
+
+        # Concrete dish intent check
+        query_dishes = raw_query_tokens.intersection(CONCRETE_DISH_TERMS)
+        if query_dishes:
+            allowed_dish_terms = set()
+            for dish in query_dishes:
+                allowed_dish_terms.update(QUERY_SYNONYMS.get(dish, {dish}))
+                allowed_dish_terms.add(dish)
+
+            # Check if restaurant or any of its items matches allowed dish terms
+            all_restaurant_tokens = tokenized_cuisine | tokenized_restaurant_tags | _tokens(restaurant.name) | _tokens(str(restaurant.metadata.get("description") or ""))
+            for item in restaurant.food_items:
+                all_restaurant_tokens.update(_tokens(item.name))
+                all_restaurant_tokens.update(_tokens(item.description or ""))
+                item_tags = {t.lower() for t in item.tags} if item.tags else set()
+                all_restaurant_tokens.update({tok for tag in item_tags for tok in _tokens(tag)})
+
+            if not allowed_dish_terms.intersection(all_restaurant_tokens):
+                score -= 100
+                negative_factors.append("no concrete dish match")
 
         identity_matches = raw_query_tokens.intersection(_restaurant_identity_terms(restaurant))
         if identity_matches:
@@ -393,6 +455,14 @@ def _score_item(
     score = 0.0
     matched: list[str] = []
     negative: list[str] = []
+
+    # Structured item tag matching
+    structured_item_tags = {t.lower() for t in item.tags} if item.tags else set()
+    tokenized_item_tags = {tok for tag in structured_item_tags for tok in _tokens(tag)}
+    item_tag_matches = raw_query_tokens.intersection(tokenized_item_tags)
+    if item_tag_matches:
+        score += min(50, 25 * len(item_tag_matches))
+        matched.extend([f"structured item tag {t}" for t in sorted(item_tag_matches)])
 
     item_name_terms = _tokens(item.name)
     item_description_terms = _tokens(item.description or "")
@@ -595,7 +665,7 @@ def _restaurant_terms(restaurant: Restaurant) -> set[str]:
     ]
     for item in restaurant.food_items:
         values.extend([item.name, item.description or "", *(item.tags or [])])
-    return _expand_tokens(_tokens(" ".join(values)))
+    return _tokens(" ".join(values))
 
 
 def _restaurant_identity_terms(restaurant: Restaurant) -> set[str]:
@@ -614,7 +684,7 @@ def _restaurant_identity_terms(restaurant: Restaurant) -> set[str]:
 
 
 def _item_terms(item: FoodItem) -> set[str]:
-    return _expand_tokens(_tokens(" ".join([item.name, item.description or "", *(item.tags or [])])))
+    return _tokens(" ".join([item.name, item.description or "", *(item.tags or [])]))
 
 
 def _tokens(value: str) -> set[str]:
