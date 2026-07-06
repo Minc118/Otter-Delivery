@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-import { getRestaurants } from "../../services/catalogService.js";
 import EmptyState from "../ui/EmptyState.jsx";
 import RestaurantCard from "./RestaurantCard.jsx";
 
@@ -31,7 +29,7 @@ export default function RestaurantGrid({ restaurants, loading, error }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
       {restaurants.map((restaurant) => (
-        <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+        <RestaurantCard key={restaurant.id} restaurant={restaurant} showRibbon={false} />
       ))}
     </div>
   );

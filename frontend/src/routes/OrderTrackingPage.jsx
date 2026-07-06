@@ -14,6 +14,10 @@ import {
 import { getOrderById } from "../services/orderService.js";
 import { normalizeRouteEstimate } from "../services/trackingState.js";
 import { getRoutePoints, normalizeRoutePoint } from "../services/routeGeometry.js";
+import {
+  getTrackingStatusText,
+  getTrackingStatusTitle,
+} from "../services/orderStatus.js";
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
@@ -24,22 +28,33 @@ export default function OrderTrackingPage() {
     trackedOrders,
   } = useCart();
   const [tracking, setTracking] = useState(null);
+  const [trackingUnavailableOrderIds, setTrackingUnavailableOrderIds] =
+    useState(() => new Set());
   const storedOrder = trackedOrders.find(
     (order) => String(order.id) === String(id),
   );
+  const liveTrackingMissing = trackingUnavailableOrderIds.has(String(id));
+  const trackingUnavailable =
+    liveTrackingMissing ||
+    storedOrder?.trackingStatus === "tracking_unavailable";
+  const isNumericRouteId = isNumericOrderId(id);
+  const staticFallbackOrder = isNumericRouteId ? null : getOrderById(id);
   const baseOrder = getTrackingOrder({
-    fallbackOrder: getOrderById(id),
+    fallbackOrder: staticFallbackOrder,
     id,
+    isTrackingUnavailable: trackingUnavailable,
     storedOrder,
     tracking,
   });
-  const simulation = useDeliverySimulation(baseOrder);
+  const simulation = useDeliverySimulation(baseOrder, {
+    disabled: trackingUnavailable,
+  });
   const order = {
     ...baseOrder,
     ...simulation,
     routeProgress: simulation?.routeProgress ?? baseOrder?.routeProgress ?? 0,
   };
-  const canShowRouteMap = hasRouteMap(order);
+  const canShowRouteMap = !trackingUnavailable && hasRouteMap(order);
 
   useEffect(() => {
     document.title = "Order Tracking - Otter Delivery";
@@ -51,11 +66,12 @@ export default function OrderTrackingPage() {
   useEffect(() => {
     let cancelled = false;
 
-    if (!shouldRequestBackendTracking(storedOrder)) {
+    if (!shouldRequestBackendTracking(storedOrder, liveTrackingMissing)) {
       setTracking(null);
       return undefined;
     }
 
+    setTracking(null);
     getOrderTracking(id)
       .then((nextTracking) => {
         if (!cancelled) {
@@ -65,6 +81,11 @@ export default function OrderTrackingPage() {
       .catch((error) => {
         if (!cancelled) {
           if (isTrackingNotFoundError(error)) {
+            setTrackingUnavailableOrderIds((currentOrderIds) => {
+              const nextOrderIds = new Set(currentOrderIds);
+              nextOrderIds.add(String(id));
+              return nextOrderIds;
+            });
             markTrackingUnavailable(id);
           }
           setTracking(null);
@@ -74,7 +95,7 @@ export default function OrderTrackingPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, markTrackingUnavailable, storedOrder]);
+  }, [id, liveTrackingMissing, markTrackingUnavailable, storedOrder]);
 
   useEffect(() => {
     if (storedOrder) {
@@ -92,6 +113,26 @@ export default function OrderTrackingPage() {
     }
   }, [id, markDeliveryDelivered, simulation, storedOrder]);
 
+  const isOrderNotFound = !storedOrder && !staticFallbackOrder;
+
+  if (isOrderNotFound) {
+    return (
+      <div className="bg-background min-h-full flex items-center justify-center p-8 text-center min-h-[460px]">
+        <div className="max-w-md">
+          <span className="material-symbols-outlined mb-4 text-5xl text-error">
+            error
+          </span>
+          <h2 className="font-section-title text-section-title text-on-surface">
+            Order tracking unavailable
+          </h2>
+          <p className="mt-3 font-body-md text-body-md text-on-surface-variant font-medium">
+            We could not find tracking information for order #{id}. The driver service may have been restarted, or this order ID is invalid.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-background min-h-full">
       <div className="w-full max-w-container-max mx-auto px-margin-x py-stack-lg flex flex-col gap-stack-lg">
@@ -103,11 +144,17 @@ export default function OrderTrackingPage() {
         <TrackingStatusHeader order={order} />
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-          {simulation || canShowRouteMap ? (
-            <DeliveryMap order={order} />
-          ) : (
-            <PendingTrackingPanel order={order} />
-          )}
+          <div className="lg:col-span-2 flex flex-col gap-stack-lg">
+            {trackingUnavailable ? (
+              <PendingTrackingPanel order={order} />
+            ) : (
+              simulation || canShowRouteMap ? (
+                <DeliveryMap order={order} />
+              ) : (
+                <PendingTrackingPanel order={order} />
+              )
+            )}
+          </div>
           <div className="flex flex-col gap-stack-md">
             <OrderSummary order={order} />
             <SupportCard />
@@ -118,59 +165,93 @@ export default function OrderTrackingPage() {
   );
 }
 
-function shouldRequestBackendTracking(storedOrder) {
+function shouldRequestBackendTracking(storedOrder, liveTrackingMissing = false) {
   return Boolean(
-    storedOrder?.assignmentStatus === "assigned" &&
+    !liveTrackingMissing &&
+      storedOrder?.trackingStatus !== "tracking_unavailable" &&
+      storedOrder?.assignmentStatus === "assigned" &&
+      !storedOrder.deliveredAt &&
       storedOrder.trackingStartedAt &&
       (storedOrder.assignment || storedOrder.assignedDriver),
   );
 }
 
-function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
+function isNumericOrderId(orderId) {
+  return /^\d+$/.test(String(orderId ?? "").trim());
+}
+
+function getTrackingOrder({
+  fallbackOrder,
+  id,
+  isTrackingUnavailable = false,
+  storedOrder,
+  tracking,
+}) {
   if (String(storedOrder?.id) !== String(id)) {
     return fallbackOrder;
   }
 
+  const snapshot = storedOrder.trackingSnapshot ?? {};
   const assignmentStatus = storedOrder.assignmentStatus;
-  const assignedDriverName =
-    storedOrder.assignedDriver?.name ?? "Driver pending";
-  const hasTracking = tracking?.assignment || tracking?.events?.length > 0;
-  const routeEstimate = normalizeRouteEstimate(storedOrder.routeEstimate);
+  const isUnavailable =
+    isTrackingUnavailable ||
+    storedOrder.trackingStatus === "tracking_unavailable";
+  const displayStatus = isUnavailable
+    ? "tracking_unavailable"
+    : (storedOrder.deliveredAt ? "delivered" : assignmentStatus);
+  const assignedDriverName = isUnavailable
+    ? null
+    : (storedOrder.assignedDriver?.name ?? snapshot.driver?.name ?? "Driver pending");
+  const hasTracking =
+    !isUnavailable && (tracking?.assignment || tracking?.events?.length > 0);
+  const routeEstimate = normalizeRouteEstimate(
+    storedOrder.routeEstimate ?? snapshot.routeEstimate,
+  );
   const latestTrackedLocation = [...(tracking?.events ?? [])]
     .reverse()
     .find((event) => event.location)?.location;
 
   return {
-    ...fallbackOrder,
+    ...(fallbackOrder ?? {}),
     id: storedOrder.id,
     displayId: storedOrder.displayId,
     etaModel: storedOrder.deliveryEta,
-    rider: {
-      name: assignedDriverName,
-    },
-    statusText: getStatusText(assignmentStatus, hasTracking),
-    statusTitle: getStatusTitle(assignmentStatus),
+    phase: isUnavailable ? null : fallbackOrder?.phase,
+    trackingStatus: isUnavailable
+      ? "tracking_unavailable"
+      : storedOrder.trackingStatus,
+    rider: assignedDriverName ? { name: assignedDriverName } : null,
+    statusText: getTrackingStatusText(displayStatus, hasTracking),
+    statusTitle: getTrackingStatusTitle(displayStatus),
     estimatedArrival:
-      storedOrder.estimatedDeliveryTime ?? routeEstimate?.etaLabel ?? "Pending",
-    routePoints: routeEstimate?.routePoints,
-    encodedPolyline: routeEstimate?.encodedPolyline,
+      isUnavailable
+        ? "Unavailable"
+        : (storedOrder.deliveredAt
+            ? "Delivered"
+            : storedOrder.estimatedDeliveryTime ?? snapshot.estimatedDeliveryTime ?? routeEstimate?.etaLabel ?? "Pending"),
+    routePoints: routeEstimate?.routePoints ?? snapshot.routePoints,
+    encodedPolyline: routeEstimate?.encodedPolyline ?? snapshot.encodedPolyline,
     routeProvider:
-      routeEstimate?.provider ??
+      routeEstimate?.provider ?? snapshot.routeProvider ??
       (storedOrder.assignmentStatus === "assigned" ||
       storedOrder.assignmentStatus === "failed" ||
       storedOrder.assignmentStatus === "pending"
         ? "coordinate_fallback"
         : null),
-    routeDurationSeconds: routeEstimate?.durationSeconds,
+    routeDurationSeconds: routeEstimate?.durationSeconds ?? snapshot.routeDurationSeconds,
     pickupLocation:
-      routeEstimate?.originLocation ?? storedOrder.pickupLocation,
+      routeEstimate?.originLocation ?? storedOrder.pickupLocation ?? snapshot.pickupLocation,
     deliveryLocation:
-      routeEstimate?.destinationLocation ?? {
-        lat: storedOrder.deliveryAddress.latitude,
-        lng: storedOrder.deliveryAddress.longitude,
+      routeEstimate?.destinationLocation ??
+      storedOrder.deliveryLocation ??
+      snapshot.deliveryLocation ?? {
+        lat: storedOrder.deliveryAddress?.latitude,
+        lng: storedOrder.deliveryAddress?.longitude,
       },
     driverLocation:
-      latestTrackedLocation ?? storedOrder.assignedDriver?.currentLocation,
+      isUnavailable
+        ? null
+        : (latestTrackedLocation ?? storedOrder.assignedDriver?.currentLocation),
     deliveryAddress: storedOrder.deliveryAddress,
     trackingStartedAt: storedOrder.trackingStartedAt,
     restaurant: {
@@ -181,26 +262,6 @@ function getTrackingOrder({ fallbackOrder, id, storedOrder, tracking }) {
     deliveryFeeCents: storedOrder.deliveryFeeCents,
     serviceFeeCents: 0,
   };
-}
-
-function getStatusText(assignmentStatus, hasTracking) {
-  if (hasTracking) {
-    return "Driver assigned";
-  }
-  if (assignmentStatus === "failed") {
-    return "Driver assignment temporarily unavailable";
-  }
-  return "Preparing order";
-}
-
-function getStatusTitle(assignmentStatus) {
-  if (assignmentStatus === "assigned") {
-    return "Driver accepted your order";
-  }
-  if (assignmentStatus === "failed") {
-    return "We are still assigning a driver";
-  }
-  return "Your order is being prepared";
 }
 
 function hasRouteMap(order) {
@@ -219,18 +280,20 @@ function hasRouteMap(order) {
 }
 
 function PendingTrackingPanel({ order }) {
+  const isUnavailable = order.trackingStatus === "tracking_unavailable";
   return (
     <div className="lg:col-span-2 flex min-h-[460px] items-center justify-center rounded-xl border border-surface bg-surface-container-lowest p-8 text-center shadow-[0_12px_32px_rgba(36,36,38,0.04)] lg:min-h-[620px]">
       <div className="max-w-md">
-        <span className="material-symbols-outlined mb-4 text-5xl text-primary">
-          restaurant
+        <span className={`material-symbols-outlined mb-4 text-5xl ${isUnavailable ? "text-error" : "text-primary"}`}>
+          {isUnavailable ? "error" : "restaurant"}
         </span>
         <h2 className="font-section-title text-section-title text-on-surface">
-          Preparing your order
+          {isUnavailable ? "Tracking unavailable" : "Preparing your order"}
         </h2>
         <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
-          Tracking map for order #{order.displayId} will appear once route
-          information is available. No sample driver location is being shown.
+          {isUnavailable
+            ? "We could not connect to the driver tracking service for this order. It may have been completed or the service was restarted."
+            : `Tracking map for order #${order.displayId} will appear when saved route information is available. Older orders without a route snapshot show this summary instead.`}
         </p>
       </div>
     </div>

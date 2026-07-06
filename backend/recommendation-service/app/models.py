@@ -51,6 +51,7 @@ class RecommendationRequest(Base):
     free_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     request_preferences: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     stored_preferences: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    normalized_intent: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     restaurant_service_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -159,6 +160,38 @@ class RecommendationTrainingEvent(Base):
     negative_factors: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     feature_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="fallback")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class RecommendationEvent(Base):
+    __tablename__ = "recommendation_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('shown', 'click', 'order')",
+            name="recommendation_events_type_supported",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    request_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("recommendation_requests.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    profile_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    restaurant_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    order_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    event_metadata: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

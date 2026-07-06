@@ -9,25 +9,133 @@ from app.services.restaurant_client import FoodItem, Restaurant
 
 QUERY_SYNONYMS = {
     "spicy": {"spicy", "hot", "chili", "curry"},
+    "hot": {"hot", "spicy", "chili"},
     "vegetarian": {"vegetarian", "veggie", "tofu", "plant"},
     "vegan": {"vegan", "plant"},
     "healthy": {"healthy", "fresh", "salad", "bowl"},
     "asian": {"asian", "thai", "japanese", "korean", "chinese", "sushi", "ramen", "noodles", "curry"},
-    "turkish": {"turkish", "kebab", "doner", "döner"},
+    "indian": {"indian", "curry", "masala", "dal"},
+    "italian": {"italian", "pizza", "pasta", "margherita"},
+    "japanese": {"japanese", "sushi", "ramen", "noodles"},
+    "korean": {"korean", "kimchi", "bibimbap", "tteokbokki"},
+    "mexican": {"mexican", "taco", "burrito", "quesadilla"},
+    "turkish": {"turkish", "kebab", "doner", "döner", "grill"},
+    "falafel": {"falafel", "mediterranean", "middle", "eastern"},
+    "doner": {"doner", "döner", "kebab", "turkish"},
+    "döner": {"döner", "doner", "kebab", "turkish"},
+    "kebab": {"kebab", "doner", "döner", "turkish", "grill"},
     "pizza": {"pizza", "italian", "margherita"},
-    "burger": {"burger", "burgers", "american", "smash"},
+    "pasta": {"pasta", "italian"},
+    "burger": {"burger", "burgers", "american", "smash", "grill", "grills", "comfort"},
     "halal": {"halal", "halal-friendly"},
     "gluten": {"gluten", "gluten-free"},
+    "gluten-free": {"gluten-free", "gluten", "free"},
     "free": {"free", "gluten-free"},
     "comfort": {"comfort", "comforting", "warm"},
     "comforting": {"comfort", "comforting", "warm"},
     "warm": {"warm", "comfort", "comforting"},
+    "vietnamese": {"vietnamese", "pho", "noodle", "noodles"},
+    "beef": {"beef", "rindfleisch"},
+    "rindfleisch": {"rindfleisch", "beef"},
+    "chicken": {"chicken"},
+    "pork": {"pork"},
+    "pho": {"pho", "phở", "vietnamese", "noodle", "noodles"},
+    "phở": {"phở", "pho", "vietnamese", "noodle", "noodles"},
+    "bo": {"bo", "bò", "beef"},
+    "bò": {"bò", "bo", "beef"},
+    "ramen": {"ramen", "noodle", "noodles", "japanese"},
+    "sushi": {"sushi", "japanese", "maki", "nigiri", "sashimi", "asian"},
     "noodle": {"noodle", "noodles", "ramen"},
     "noodles": {"noodle", "noodles", "ramen"},
+    "bibimbap": {"bibimbap", "korean", "bowl"},
+    "curry": {"curry", "indian", "thai", "spicy", "warm"},
+    "burrito": {"burrito", "mexican"},
+    "taco": {"taco", "tacos", "mexican"},
+    "tacos": {"taco", "tacos", "mexican"},
     "bowl": {"bowl", "bowls", "healthy"},
+    "salad": {"salad", "healthy", "fresh"},
+    "tofu": {"tofu", "vegetarian", "vegan"},
+    "shawarma": {"shawarma", "mediterranean", "middle", "eastern"},
+    "mezze": {"mezze", "mediterranean"},
     "cheap": {"cheap", "low"},
     "kreuzberg": {"kreuzberg"},
 }
+
+
+CONCRETE_DISH_TERMS = {
+    "falafel",
+    "doner",
+    "döner",
+    "kebab",
+    "shawarma",
+    "mezze",
+    "pizza",
+    "pasta",
+    "burger",
+    "ramen",
+    "sushi",
+    "pho",
+    "noodle",
+    "noodles",
+    "bibimbap",
+    "curry",
+    "burrito",
+    "taco",
+    "tacos",
+    "bowl",
+    "salad",
+    "tofu",
+}
+
+
+MUTUALLY_EXCLUSIVE_DISHES = {
+    "burger",
+    "pizza",
+    "sushi",
+    "falafel",
+    "kebab",
+    "doner",
+    "döner",
+    "taco",
+    "burrito",
+    "pho",
+    "ramen",
+    "pasta",
+}
+
+
+INGREDIENT_TERMS = {
+    "beef",
+    "rindfleisch",
+    "chicken",
+    "pork",
+    "tofu",
+}
+
+
+CUISINE_TERMS = {
+    "american",
+    "asian",
+    "chinese",
+    "indian",
+    "italian",
+    "japanese",
+    "korean",
+    "mediterranean",
+    "mexican",
+    "thai",
+    "turkish",
+    "vietnamese",
+}
+
+
+HIGH_INTENT_TERMS = CONCRETE_DISH_TERMS | INGREDIENT_TERMS | CUISINE_TERMS
+
+
+SHORT_FOOD_TOKENS = {"bo", "bò"}
+
+ASIAN_CUISINES = {"japanese", "chinese", "korean", "thai", "vietnamese", "indian", "asian", "pho", "ramen", "sushi", "noodles"}
+WESTERN_CUISINES = {"american", "italian", "mexican", "turkish", "mediterranean", "middle eastern", "burger", "pizza"}
 
 
 PRICE_RANGES = {
@@ -120,13 +228,22 @@ def score_restaurants(
         limit: int = 20,
 ) -> list[ScoredCandidate]:
     history_by_restaurant = history_by_restaurant or {}
-    query_tokens = _expand_tokens(_tokens(query or ""))
-    dietary = _lower_list(preferences.get("dietary") or preferences.get("dietary_preferences"))
-    allergies = _lower_list(preferences.get("allergies") or preferences.get("allergens"))
-    favorite_cuisines = _lower_list(
-        preferences.get("favorite_cuisines") or preferences.get("cuisine_preferences")
+    raw_query_tokens = _tokens(query or "")
+    query_tokens = _expand_tokens(raw_query_tokens)
+    is_query_asian = any(tok in ASIAN_CUISINES for tok in raw_query_tokens)
+    is_query_western = any(tok in WESTERN_CUISINES for tok in raw_query_tokens)
+    dietary = _lower_list(_first_present(preferences, "dietary", "dietary_preferences", "dietaryPreferences"))
+    allergies = _lower_list(_first_present(preferences, "allergies", "allergens"))
+    disliked_ingredients = _lower_list(
+        _first_present(preferences, "disliked_ingredients", "dislikedIngredients")
     )
-    price_range = _normalize_price_range(preferences.get("price_range") or preferences.get("priceRange"))
+    favorite_cuisines = _lower_list(
+        _first_present(preferences, "favorite_cuisines", "favoriteCuisines", "cuisine_preferences", "cuisinePreferences")
+    )
+    price_range = _normalize_price_range(_first_present(preferences, "price_range", "priceRange"))
+    max_price = _normalize_max_price(
+        _first_present(preferences, "max_price", "maxPrice", "maximum_price", "maximumPrice")
+    )
     feedback_by_restaurant = feedback_by_restaurant or {}
 
     candidates: list[ScoredCandidate] = []
@@ -142,10 +259,12 @@ def score_restaurants(
             _score_item(
                 restaurant=restaurant,
                 item=item,
+                raw_query_tokens=raw_query_tokens,
                 query_tokens=query_tokens,
                 dietary=dietary,
                 favorite_cuisines=favorite_cuisines,
                 price_range=price_range,
+                max_price=max_price,
             )
             for item in available_items
         ]
@@ -164,6 +283,91 @@ def score_restaurants(
             score -= 50
             negative_factors.append("closed")
 
+        query_score, query_matches, query_negatives = _query_score(query_tokens, reliable_terms)
+        score += query_score
+        matched_factors.extend(query_matches)
+        negative_factors.extend(query_negatives)
+
+        # Structured metadata matches
+        structured_cuisine = (restaurant.cuisine or "").lower()
+        structured_restaurant_tags = {t.lower() for t in restaurant.tags} if restaurant.tags else set()
+        tokenized_cuisine = _tokens(structured_cuisine)
+        tokenized_restaurant_tags = {tok for tag in structured_restaurant_tags for tok in _tokens(tag)}
+
+        # Region fallback boost
+        is_candidate_asian = any(c in structured_cuisine for c in ASIAN_CUISINES)
+        is_candidate_western = any(c in structured_cuisine for c in WESTERN_CUISINES)
+        region_boost = 0.0
+        if is_query_asian and is_candidate_asian:
+            region_boost = 2.0
+            matched_factors.append("region match")
+        elif is_query_western and is_candidate_western:
+            region_boost = 2.0
+            matched_factors.append("region match")
+        score += region_boost
+
+        cuisine_struct_score = 0
+        cuisine_matches = raw_query_tokens.intersection(tokenized_cuisine)
+        if cuisine_matches:
+            cuisine_struct_score += 35
+            matched_factors.extend([f"structured cuisine {m}" for m in sorted(cuisine_matches)])
+        else:
+            cuisine_syn_matches = query_tokens.intersection(tokenized_cuisine)
+            if cuisine_syn_matches:
+                cuisine_struct_score += 15
+                matched_factors.extend([f"structured cuisine related {m}" for m in sorted(cuisine_syn_matches)])
+        score += cuisine_struct_score
+
+        tag_struct_score = 0
+        tag_matches = raw_query_tokens.intersection(tokenized_restaurant_tags)
+        if tag_matches:
+            tag_struct_score += min(30, 15 * len(tag_matches))
+            matched_factors.extend([f"structured tag {t}" for t in sorted(tag_matches)])
+        score += tag_struct_score
+
+        # Concrete dish intent check
+        query_dishes = raw_query_tokens.intersection(CONCRETE_DISH_TERMS)
+        if query_dishes:
+            allowed_dish_terms = set()
+            for dish in query_dishes:
+                allowed_dish_terms.update(_concrete_dish_terms(dish))
+                allowed_dish_terms.add(dish)
+
+            # Check if restaurant or any of its items matches allowed dish terms
+            all_restaurant_tokens = tokenized_cuisine | tokenized_restaurant_tags | _tokens(restaurant.name) | _tokens(str(restaurant.metadata.get("description") or ""))
+            for item in restaurant.food_items:
+                all_restaurant_tokens.update(_tokens(item.name))
+                all_restaurant_tokens.update(_tokens(item.description or ""))
+                item_tags = {t.lower() for t in item.tags} if item.tags else set()
+                all_restaurant_tokens.update({tok for tag in item_tags for tok in _tokens(tag)})
+
+            if not allowed_dish_terms.intersection(all_restaurant_tokens):
+                score -= 100
+                negative_factors.append("no concrete dish match")
+
+                # Check for conflicting concrete dish types
+                conflicting_matches = all_restaurant_tokens.intersection(MUTUALLY_EXCLUSIVE_DISHES)
+                if conflicting_matches:
+                    has_true_conflict = False
+                    for conflict in conflicting_matches:
+                        # Allow pho/ramen/noodle fallbacks
+                        if query_dishes.intersection({"pho", "ramen"}) and conflict in {"pho", "ramen"}:
+                            continue
+                        # Allow pizza/pasta fallbacks
+                        if query_dishes.intersection({"pizza", "pasta"}) and conflict in {"pizza", "pasta"}:
+                            continue
+                        has_true_conflict = True
+                        break
+
+                    if has_true_conflict:
+                        score -= 150
+                        negative_factors.append("conflicting dish type")
+
+        identity_matches = raw_query_tokens.intersection(_restaurant_identity_terms(restaurant))
+        if identity_matches:
+            score += min(12, 3 * len(identity_matches))
+            matched_factors.extend([f"restaurant identity {term}" for term in sorted(identity_matches)[:4]])
+
         cuisine_score, cuisine_matches, cuisine_negatives = _cuisine_score(
             restaurant,
             favorite_cuisines,
@@ -173,7 +377,11 @@ def score_restaurants(
         matched_factors.extend(cuisine_matches)
         negative_factors.extend(cuisine_negatives)
 
-        dietary_score, dietary_matches, dietary_negatives = _dietary_score(dietary, reliable_terms)
+        dietary_score, dietary_matches, dietary_negatives = _dietary_score(
+            dietary,
+            reliable_terms,
+            query_tokens,
+        )
         score += dietary_score
         matched_factors.extend(dietary_matches)
         negative_factors.extend(dietary_negatives)
@@ -183,10 +391,18 @@ def score_restaurants(
         matched_factors.extend(price_matches)
         negative_factors.extend(price_negatives)
 
-        query_score, query_matches, query_negatives = _query_score(query_tokens, reliable_terms)
-        score += query_score
-        matched_factors.extend(query_matches)
-        negative_factors.extend(query_negatives)
+        max_price_score, max_price_matches, max_price_negatives = _max_price_score(max_price, available_items)
+        score += max_price_score
+        matched_factors.extend(max_price_matches)
+        negative_factors.extend(max_price_negatives)
+
+        disliked_score, disliked_matches, disliked_negatives = _disliked_ingredient_score(
+            disliked_ingredients,
+            reliable_terms,
+        )
+        score += disliked_score
+        matched_factors.extend(disliked_matches)
+        negative_factors.extend(disliked_negatives)
 
         feedback_score, feedback_match, feedback_negative = _feedback_score(
             feedback_by_restaurant.get(restaurant.restaurant_id)
@@ -205,7 +421,7 @@ def score_restaurants(
             history_score = 0
 
         if item_scores:
-            score += min(item_scores[0][0], 15)
+            score += min(item_scores[0][0], 35)
             matched_factors.extend(item_scores[0][2])
             negative_factors.extend(item_scores[0][3])
 
@@ -216,7 +432,10 @@ def score_restaurants(
             "query_keywords": sorted(query_tokens),
             "dietary_preferences": sorted(dietary),
             "price_preference": price_range,
+            "max_price": max_price,
             "cuisine_preference": sorted(favorite_cuisines),
+            "allergies": sorted(allergies),
+            "disliked_ingredients": sorted(disliked_ingredients),
             "candidate_category": restaurant.cuisine or (restaurant.tags[0] if restaurant.tags else None),
             "candidate_price_range": candidate_price_range,
             "candidate_restaurant_id": restaurant.restaurant_id,
@@ -258,10 +477,12 @@ def _score_item(
     *,
     restaurant: Restaurant,
     item: FoodItem,
+    raw_query_tokens: set[str],
     query_tokens: set[str],
     dietary: set[str],
     favorite_cuisines: set[str],
     price_range: str | None,
+    max_price: float | None,
 ) -> tuple[float, FoodItem, list[str], list[str]]:
     restaurant_terms = _restaurant_terms(restaurant)
     item_terms = _item_terms(item)
@@ -270,23 +491,77 @@ def _score_item(
     matched: list[str] = []
     negative: list[str] = []
 
+    # Structured item tag matching
+    structured_item_tags = {t.lower() for t in item.tags} if item.tags else set()
+    tokenized_item_tags = {tok for tag in structured_item_tags for tok in _tokens(tag)}
+    item_tag_matches = raw_query_tokens.intersection(tokenized_item_tags)
+    if item_tag_matches:
+        score += min(50, 25 * len(item_tag_matches))
+        matched.extend([f"structured item tag {t}" for t in sorted(item_tag_matches)])
+
+    item_name_terms = _tokens(item.name)
+    item_description_terms = _tokens(item.description or "")
+    exact_name_matches = raw_query_tokens.intersection(item_name_terms)
+    exact_description_matches = raw_query_tokens.intersection(item_description_terms)
+    exact_concrete_name_matches = exact_name_matches.intersection(CONCRETE_DISH_TERMS)
+    exact_concrete_description_matches = exact_description_matches.intersection(CONCRETE_DISH_TERMS)
+    exact_ingredient_name_matches = exact_name_matches.intersection(INGREDIENT_TERMS)
+    exact_ingredient_description_matches = exact_description_matches.intersection(INGREDIENT_TERMS)
+    intent_terms = raw_query_tokens.intersection(HIGH_INTENT_TERMS)
+
+    if exact_concrete_name_matches:
+        score += 34
+        matched.extend([f"exact item {term}" for term in sorted(exact_concrete_name_matches)[:3]])
+    elif exact_name_matches:
+        score += 16
+        matched.extend([f"item name {term}" for term in sorted(exact_name_matches)[:3]])
+
+    if exact_concrete_description_matches:
+        score += 22
+        matched.extend([f"item description {term}" for term in sorted(exact_concrete_description_matches)[:3]])
+    elif exact_description_matches:
+        score += 8
+        matched.extend([f"description {term}" for term in sorted(exact_description_matches)[:3]])
+
+    if exact_ingredient_name_matches:
+        score += 18
+        matched.extend([f"exact ingredient {term}" for term in sorted(exact_ingredient_name_matches)[:3]])
+    elif exact_ingredient_description_matches:
+        score += 10
+        matched.extend([f"ingredient {term}" for term in sorted(exact_ingredient_description_matches)[:3]])
+
+    item_intent_matches = intent_terms.intersection(item_terms)
+    if len(item_intent_matches) >= 2:
+        score += min(30, 10 + 7 * len(item_intent_matches))
+        matched.extend([f"combined item intent {term}" for term in sorted(item_intent_matches)[:4]])
+
+    restaurant_intent_matches = intent_terms.intersection(restaurant_terms)
+    if item_intent_matches and restaurant_intent_matches:
+        score += min(18, 4 * len(item_intent_matches | restaurant_intent_matches))
+        matched.extend([f"combined restaurant intent {term}" for term in sorted(restaurant_intent_matches)[:4]])
+
     query_matches = query_tokens.intersection(item_terms)
     if query_matches:
-        score += min(12, 6 + 2 * len(query_matches))
+        score += min(10, 4 + 2 * len(query_matches))
         matched.extend(sorted(query_matches)[:4])
     elif query_tokens.intersection(restaurant_terms):
         score += 3
     if dietary and dietary.intersection(terms):
-        score += 6
+        score += 5 if dietary.intersection(query_tokens) else 2
         matched.extend(sorted(dietary.intersection(terms)))
     if favorite_cuisines and favorite_cuisines.intersection(terms):
-        score += 4
+        score += 2
         matched.extend(sorted(favorite_cuisines.intersection(terms)))
     if price_range and item.price is not None:
         price_score, price_matched, price_negative = _price_score(price_range, [item])
         score += max(min(price_score, 4), -4)
         matched.extend(price_matched)
         negative.extend(price_negative)
+    if max_price is not None and item.price is not None:
+        max_price_score, max_price_matched, max_price_negative = _max_price_score(max_price, [item])
+        score += max(min(max_price_score, 2), -3)
+        matched.extend(max_price_matched)
+        negative.extend(max_price_negative)
 
     return score, item, matched, negative
 
@@ -300,22 +575,27 @@ def _cuisine_score(
         return 0, [], []
     cuisine = (restaurant.cuisine or "").lower()
     if cuisine and cuisine in favorite_cuisines:
-        return 20, [f"{cuisine} cuisine"], []
+        return 8, [f"{cuisine} cuisine"], []
     related = favorite_cuisines.intersection(terms)
     if related:
-        return 10, sorted(related), []
-    return -10, [], ["no cuisine match"]
+        return 4, sorted(related), []
+    return 0, [], []
 
 
-def _dietary_score(dietary: set[str], terms: set[str]) -> tuple[int, list[str], list[str]]:
+def _dietary_score(
+    dietary: set[str],
+    terms: set[str],
+    query_tokens: set[str],
+) -> tuple[int, list[str], list[str]]:
     if not dietary:
         return 0, [], []
+    explicit = dietary.intersection(query_tokens)
     matched = dietary.intersection(terms)
-    if len(matched) == len(dietary):
-        return 30, sorted(matched), []
     if matched:
-        return 15, sorted(matched), []
-    return 0, [], ["dietary preference unknown"]
+        return (18 if explicit else 6), sorted(matched), []
+    if explicit:
+        return -8, [], ["missing explicit dietary match"]
+    return 0, [], []
 
 
 def _price_score(price_range: str | None, items: list[FoodItem]) -> tuple[int, list[str], list[str]]:
@@ -331,6 +611,33 @@ def _price_score(price_range: str | None, items: list[FoodItem]) -> tuple[int, l
     if average < low or average <= high + 5:
         return 5, [f"close to {price_range} price"], []
     return -20, [], ["too expensive"]
+
+
+def _max_price_score(max_price: float | None, items: list[FoodItem]) -> tuple[int, list[str], list[str]]:
+    if max_price is None or not items:
+        return 0, [], []
+    prices = [item.price for item in items if item.price is not None]
+    if not prices:
+        return 0, [], ["price unknown"]
+    average = sum(prices) / len(prices)
+    cheapest = min(prices)
+    if average <= max_price:
+        return 5, [f"within {max_price:.2f} max"], []
+    if cheapest <= max_price:
+        return 2, [f"has options under {max_price:.2f}"], []
+    return -4, [], [f"above {max_price:.2f} max"]
+
+
+def _disliked_ingredient_score(
+    disliked_ingredients: set[str],
+    terms: set[str],
+) -> tuple[int, list[str], list[str]]:
+    if not disliked_ingredients:
+        return 0, [], []
+    matched = disliked_ingredients.intersection(terms)
+    if matched:
+        return -8, [], [f"contains disliked {item}" for item in sorted(matched)[:3]]
+    return 0, [], []
 
 
 def _candidate_price_range(items: list[FoodItem]) -> str | None:
@@ -350,9 +657,9 @@ def _query_score(query_tokens: set[str], terms: set[str]) -> tuple[int, list[str
         return 0, [], []
     matched = query_tokens.intersection(terms)
     if len(matched) >= 2:
-        return min(30, 14 + 4 * len(matched)), sorted(matched)[:5], []
+        return min(45, 22 + 6 * len(matched)), sorted(matched)[:5], []
     if matched:
-        return 10, sorted(matched), []
+        return 18, sorted(matched), []
     return -10, [], ["no query match"]
 
 
@@ -369,6 +676,9 @@ def _completion_score(score: float) -> float:
 
 
 def _reason(matched: list[str], negative: list[str]) -> str:
+    meaningful_matches = [match for match in matched if match != "open"]
+    if meaningful_matches:
+        return f"Matches {', '.join(_unique(meaningful_matches)[:4])}."
     if matched:
         return f"Matches {', '.join(_unique(matched)[:4])}."
     if negative:
@@ -390,18 +700,43 @@ def _restaurant_terms(restaurant: Restaurant) -> set[str]:
     ]
     for item in restaurant.food_items:
         values.extend([item.name, item.description or "", *(item.tags or [])])
-    return _expand_tokens(_tokens(" ".join(values)))
+    return _tokens(" ".join(values))
+
+
+def _restaurant_identity_terms(restaurant: Restaurant) -> set[str]:
+    metadata = restaurant.metadata or {}
+    address = restaurant.address or {}
+    values = [
+        restaurant.name,
+        restaurant.cuisine or "",
+        str(metadata.get("description") or ""),
+        str(address.get("street") or ""),
+        str(address.get("city") or ""),
+        str(address.get("postalCode") or address.get("postal_code") or ""),
+        *(restaurant.tags or []),
+    ]
+    return _tokens(" ".join(values))
 
 
 def _item_terms(item: FoodItem) -> set[str]:
-    return _expand_tokens(_tokens(" ".join([item.name, item.description or "", *(item.tags or [])])))
+    return _tokens(" ".join([item.name, item.description or "", *(item.tags or [])]))
 
 
 def _tokens(value: str) -> set[str]:
     normalized = value.lower()
-    for separator in ",.;:/()[]{}!?-_\n\t":
+    for separator in ",.;:/()[]{}!?_\n\t":
         normalized = normalized.replace(separator, " ")
-    return {token for token in normalized.split() if len(token) > 2}
+    tokens: set[str] = set()
+    for token in normalized.split():
+        if len(token) > 2 or token in SHORT_FOOD_TOKENS:
+            tokens.add(token)
+        if "-" in token:
+            tokens.update(
+                part
+                for part in token.split("-")
+                if len(part) > 2 or part in SHORT_FOOD_TOKENS
+            )
+    return tokens
 
 
 def _expand_tokens(tokens: set[str]) -> set[str]:
@@ -409,6 +744,23 @@ def _expand_tokens(tokens: set[str]) -> set[str]:
     for token in list(tokens):
         expanded.update(QUERY_SYNONYMS.get(token, set()))
     return expanded
+
+
+def _concrete_dish_terms(dish: str) -> set[str]:
+    terms = set(QUERY_SYNONYMS.get(dish, {dish}))
+    if dish in {"noodle", "noodles"}:
+        return terms
+    if dish in {"kebab", "doner", "döner"}:
+        return terms - {"turkish"}
+    return terms - CUISINE_TERMS - {
+        "asian",
+        "eastern",
+        "grill",
+        "healthy",
+        "middle",
+        "noodle",
+        "noodles",
+    }
 
 
 def _lower_list(value: Any) -> set[str]:
@@ -421,11 +773,28 @@ def _lower_list(value: Any) -> set[str]:
     return set()
 
 
+def _first_present(values: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in values and values[key] not in (None, [], {}):
+            return values[key]
+    return None
+
+
 def _normalize_price_range(value: Any) -> str | None:
     if value is None:
         return None
     normalized = str(value).lower().strip()
     return normalized or None
+
+
+def _normalize_max_price(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
 
 
 def _unique(values: list[str]) -> list[str]:

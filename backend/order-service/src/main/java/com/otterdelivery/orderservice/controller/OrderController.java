@@ -5,11 +5,12 @@ import com.otterdelivery.orderservice.model.Order;
 import com.otterdelivery.orderservice.model.OrderItem;
 import com.otterdelivery.orderservice.model.OrderStatus;
 import com.otterdelivery.orderservice.service.OrderService;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/orders")
 public class OrderController {
@@ -22,16 +23,15 @@ public class OrderController {
 
     @PostMapping(consumes = "application/json")
     public Order placeOrder(@RequestBody CreateOrderRequest request) {
-        System.out.println("Request arrived");
-        System.out.println(request.getCustomerId());
-        System.out.println(request.getRestaurantId());
-        System.out.println(request.getItems());
-
-        return orderService.placeOrder(
+        Order order = orderService.placeOrder(
                 request.getCustomerId(),
                 request.getRestaurantId(),
                 request.getItems()
         );
+        if (order == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order could not be created.");
+        }
+        return order;
     }
 
     @GetMapping

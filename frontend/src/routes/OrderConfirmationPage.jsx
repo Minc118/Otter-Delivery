@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import CheckoutItemsList from "../components/checkout/CheckoutItemsList.jsx";
 import CheckoutSummaryPanel from "../components/checkout/CheckoutSummaryPanel.jsx";
 import PaymentMethodSelector from "../components/checkout/PaymentMethodSelector.jsx";
+import { MissingCheckoutProfileError } from "../context/CartContext.jsx";
 import PageShell from "../components/layout/PageShell.jsx";
 import EmptyState from "../components/ui/EmptyState.jsx";
 import useCart from "../hooks/useCart.js";
@@ -26,6 +27,7 @@ export default function OrderConfirmationPage() {
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [addressDraft, setAddressDraft] = useState(deliveryAddress);
   const [orderError, setOrderError] = useState(null);
+  const [requiresLogin, setRequiresLogin] = useState(false);
   const restaurantMeta = checkoutGroup
     ? getRestaurantCheckoutMeta(
         checkoutGroup.restaurantId,
@@ -71,13 +73,20 @@ export default function OrderConfirmationPage() {
 
     setIsPlacingOrder(true);
     setOrderError(null);
+    setRequiresLogin(false);
     try {
       const order = await placeCheckoutOrder(paymentMethod);
 
       if (order) {
         navigate(`/orders/${order.id}/success`);
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof MissingCheckoutProfileError) {
+        setRequiresLogin(true);
+        setOrderError(error.message);
+        return;
+      }
+
       setOrderError("The order could not be placed. Please try again.");
     } finally {
       setIsPlacingOrder(false);
@@ -214,9 +223,19 @@ export default function OrderConfirmationPage() {
                 totalCents={totalCents}
               />
               {orderError ? (
-                <p className="text-error font-metadata text-metadata text-center" role="alert">
-                  {orderError}
-                </p>
+                <div className="flex flex-col items-center gap-3" role="alert">
+                  <p className="text-error font-metadata text-metadata text-center">
+                    {orderError}
+                  </p>
+                  {requiresLogin ? (
+                    <Link
+                      className="bg-primary-container hover:bg-surface-tint text-on-primary font-button text-button py-2 px-5 rounded-xl transition-colors"
+                      to="/login?returnTo=/orders/confirm"
+                    >
+                      Log in to continue
+                    </Link>
+                  ) : null}
+                </div>
               ) : null}
               <Link
                 className="text-center font-metadata text-metadata text-on-surface-variant hover:text-primary transition-colors underline decoration-transparent hover:decoration-primary underline-offset-4"

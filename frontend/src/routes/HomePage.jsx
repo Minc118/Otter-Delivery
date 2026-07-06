@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import AIFoodSearch from "../components/home/AIFoodSearch.jsx";
 import RecommendationSection from "../components/home/RecommendationSection.jsx";
+import { getRestaurants } from "../services/catalogService.js";
 import {
-  getRecommendations,
+  getHomepageRestaurantRecommendations,
+  logRecommendationShownEvents,
   searchRecommendations,
   searchLiveRestaurantRecommendations,
 } from "../services/recommendationService.js";
@@ -10,13 +12,67 @@ import {
 export default function HomePage() {
   const [activeQuery, setActiveQuery] = useState("");
   const [error, setError] = useState(null);
-  const [recommendationSource, setRecommendationSource] = useState("mock");
-  const [recommendations, setRecommendations] = useState(getRecommendations());
-  const [status, setStatus] = useState("idle");
+  const [recommendationSource, setRecommendationSource] = useState("restaurant-service");
+  const [recommendations, setRecommendations] = useState([]);
+  const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     document.title = "Otter Delivery - AI-Powered Food Discovery";
   }, []);
+
+  useEffect(() => {
+    loadHomepageRecommendations();
+  }, []);
+
+  async function loadHomepageRecommendations() {
+    setStatus("loading");
+    setError(null);
+    setRecommendationSource("restaurant-service");
+
+    try {
+      const restaurants = await getRestaurants();
+      const restaurantRecommendations =
+        getHomepageRestaurantRecommendations(restaurants);
+      const liveRestaurantIds = new Set(
+        restaurants.map((restaurant) => String(restaurant.restaurantId ?? restaurant.id)),
+      );
+
+      try {
+        const ranked = await searchLiveRestaurantRecommendations(undefined, { limit: 3 });
+        const rankedIds = new Set();
+        const rankedRecommendations = ranked.recommendations.filter((recommendation) => {
+          const restaurantId = String(recommendation.restaurant.id);
+          if (!liveRestaurantIds.has(restaurantId) || rankedIds.has(restaurantId)) {
+            return false;
+          }
+          rankedIds.add(restaurantId);
+          return true;
+        });
+        const fillRecommendations = restaurantRecommendations.filter(
+          (recommendation) => !rankedIds.has(String(recommendation.restaurant.id)),
+        );
+        const homepageRecommendations = [
+          ...rankedRecommendations,
+          ...fillRecommendations,
+        ].slice(0, 3);
+
+        setRecommendations(homepageRecommendations);
+        logRecommendationShownEvents(homepageRecommendations, {
+          surface: "homepage",
+          source: ranked.source,
+        });
+        setRecommendationSource(ranked.source);
+        setStatus(homepageRecommendations.length > 0 ? "success" : "empty");
+      } catch {
+        setRecommendations(restaurantRecommendations);
+        setStatus(restaurantRecommendations.length > 0 ? "success" : "empty");
+      }
+    } catch {
+      setRecommendations([]);
+      setError("Restaurant Service is unavailable. Today's recommendations could not be loaded.");
+      setStatus("unavailable");
+    }
+  }
 
   async function handleSearch(query) {
     const trimmedQuery = query.trim();
@@ -25,9 +81,7 @@ export default function HomePage() {
     setError(null);
 
     if (!trimmedQuery) {
-      setStatus("idle");
-      setRecommendationSource("mock");
-      setRecommendations(getRecommendations());
+      await loadHomepageRecommendations();
       return;
     }
 
@@ -37,6 +91,11 @@ export default function HomePage() {
     try {
       const result = await searchLiveRestaurantRecommendations(trimmedQuery);
       setRecommendations(result.recommendations);
+      logRecommendationShownEvents(result.recommendations, {
+        surface: "homepage_search",
+        query: trimmedQuery,
+        source: result.source,
+      });
       setRecommendationSource(result.source);
       setStatus(result.recommendations.length > 0 ? "success" : "empty");
     } catch (searchError) {

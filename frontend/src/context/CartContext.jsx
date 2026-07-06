@@ -20,6 +20,8 @@ import {
   isRecentActiveTrackedOrder,
   sanitizeTrackedOrdersById,
 } from "../services/trackingState.js";
+import { getRoutePoints, normalizeRoutePoint } from "../services/routeGeometry.js";
+import { logRecommendationEvent } from "../services/recommendationService.js";
 import { getCartItemCount } from "../utils/cartTotals.js";
 import { priceToCents } from "../utils/currency.js";
 
@@ -57,6 +59,75 @@ function removeStoredValue(key) {
   }
 
   window.localStorage.removeItem(key);
+}
+
+export class MissingCheckoutProfileError extends Error {
+  constructor() {
+    super("Please log in before placing an order.");
+    this.name = "MissingCheckoutProfileError";
+    this.code = "MISSING_CHECKOUT_PROFILE";
+  }
+}
+
+function readStoredProfile() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(window.localStorage.getItem("profile"));
+  } catch {
+    return null;
+  }
+}
+
+function createTrackingSnapshot(order) {
+  const routeEstimate = order.routeEstimate ?? null;
+  const estimate =
+    routeEstimate?.estimate && typeof routeEstimate.estimate === "object"
+      ? routeEstimate.estimate
+      : routeEstimate;
+  const pickupLocation = normalizeRoutePoint(
+    estimate?.originLocation ?? estimate?.pickupLocation ?? order.pickupLocation,
+  );
+  const deliveryLocation = normalizeRoutePoint(
+    estimate?.destinationLocation ??
+      estimate?.deliveryLocation ??
+      estimate?.customerLocation ??
+      order.deliveryLocation,
+  );
+  const routePoints = getRoutePoints({
+    pickupLocation,
+    deliveryLocation,
+    routePoints: estimate?.routePoints,
+    encodedPolyline: estimate?.encodedPolyline,
+  });
+
+  return {
+    orderId: order.id,
+    restaurantId: order.restaurantId,
+    restaurantName: order.restaurantName,
+    restaurantImage: order.restaurantImage,
+    pickupLocation,
+    deliveryLocation,
+    deliveryAddress: order.deliveryAddress,
+    routeEstimate,
+    routePoints,
+    encodedPolyline: estimate?.encodedPolyline,
+    routeProvider:
+      estimate?.provider ??
+      routeEstimate?.provider ??
+      (routePoints.length >= 2 ? "coordinate_fallback" : undefined),
+    routeDurationSeconds: estimate?.durationSeconds,
+    driver: order.assignedDriver,
+    assignment: order.assignment,
+    eta: order.deliveryEta,
+    estimatedDeliveryTime: order.estimatedDeliveryTime,
+    latestStatus: order.trackingStatus ?? order.assignmentStatus,
+    createdAt: order.createdAt,
+    trackingStartedAt: order.trackingStartedAt,
+    deliveredAt: order.deliveredAt,
+  };
 }
 
 function readInitialTrackingSnapshot() {
@@ -175,7 +246,12 @@ export function CartProvider({ children }) {
         return currentOrders;
       }
 
-      const deliveredOrder = { ...currentOrder, deliveredAt };
+      const deliveredOrder = {
+        ...currentOrder,
+        deliveredAt,
+        trackingStatus: "DELIVERED",
+      };
+      deliveredOrder.trackingSnapshot = createTrackingSnapshot(deliveredOrder);
       const nextOrders = {
         ...currentOrders,
         [normalizedId]: deliveredOrder,
@@ -227,6 +303,20 @@ export function CartProvider({ children }) {
         return nextOrders;
       }
 
+      if (currentOrder.trackingSnapshot || currentOrder.routeEstimate) {
+        const updatedOrder = {
+          ...currentOrder,
+          trackingStatus: "tracking_unavailable",
+          assignmentStatus: "tracking_unavailable",
+        };
+        const nextOrders = {
+          ...currentOrders,
+          [normalizedId]: updatedOrder,
+        };
+        storeValue(TRACKED_ORDERS_STORAGE_KEY, nextOrders);
+        return nextOrders;
+      }
+
       const nextOrders = { ...currentOrders };
       delete nextOrders[normalizedId];
       storeValue(TRACKED_ORDERS_STORAGE_KEY, nextOrders);
@@ -253,7 +343,13 @@ export function CartProvider({ children }) {
     return groups.filter((group) => group.items.length > 0);
   }
 
-  function addItem({ restaurantId, restaurantName, restaurantMeta, item }) {
+  function addItem({
+    restaurantId,
+    restaurantName,
+    restaurantMeta,
+    recommendationAttribution,
+    item,
+  }) {
     const itemId = String(item.id ?? item.menuItemId ?? item.foodItemId);
     const unitPriceCents =
       item.unitPriceCents ?? item.priceCents ?? priceToCents(item.price);
@@ -270,6 +366,7 @@ export function CartProvider({ children }) {
       currency: item.currency,
       restaurantId,
       restaurantName,
+      recommendationAttribution,
     };
     const existingGroup = cartGroups[0];
 
@@ -295,6 +392,7 @@ export function CartProvider({ children }) {
             restaurantId,
             restaurantName,
             restaurantMeta,
+            recommendationAttribution,
             items: [cartItem],
           },
         ];
@@ -311,6 +409,8 @@ export function CartProvider({ children }) {
           return {
             ...group,
             restaurantMeta: group.restaurantMeta ?? restaurantMeta,
+            recommendationAttribution:
+              group.recommendationAttribution ?? recommendationAttribution,
             items: [...group.items, cartItem],
           };
         }
@@ -318,6 +418,8 @@ export function CartProvider({ children }) {
         return {
           ...group,
           restaurantMeta: group.restaurantMeta ?? restaurantMeta,
+          recommendationAttribution:
+            group.recommendationAttribution ?? recommendationAttribution,
           items: group.items.map((cartItem) =>
             cartItem.id === itemId
               ? { ...cartItem, quantity: cartItem.quantity + 1 }
@@ -423,7 +525,11 @@ export function CartProvider({ children }) {
       return null;
     }
 
-    const profile = JSON.parse(localStorage.getItem("profile"));
+    const profile = readStoredProfile();
+
+    if (!profile?.id) {
+      throw new MissingCheckoutProfileError();
+    }
 
     const response = await fetch(`${ORDER_SERVICE_BASE_URL}/orders`, {
       method: "POST",
@@ -445,6 +551,20 @@ export function CartProvider({ children }) {
     }
 
     const backendOrder = await response.json();
+    if (group.recommendationAttribution?.requestId) {
+      void logRecommendationEvent({
+        requestId: group.recommendationAttribution.requestId,
+        profileId: profile.id,
+        restaurantId: group.restaurantId,
+        eventType: "order",
+        orderId: backendOrder.id,
+        metadata: {
+          itemCount: group.items.reduce((total, item) => total + item.quantity, 0),
+          totalPrice: backendOrder.totalPrice,
+          attribution: group.recommendationAttribution,
+        },
+      });
+    }
     const restaurantMeta = getRestaurantCheckoutMeta(
       group.restaurantId,
       group.restaurantMeta,
@@ -454,6 +574,7 @@ export function CartProvider({ children }) {
     const orderId = String(backendOrder.id);
     const placedOrder = {
       id: orderId,
+      customerId: profile.id,
       assignmentStatus: "pending",
       createdAt: Date.now(),
       deliveryLocation: toDriverLocation(deliveryAddress),
@@ -470,6 +591,7 @@ export function CartProvider({ children }) {
       totalCents: Math.round(backendOrder.totalPrice * 100),
       trackingStatus: "DRIVER_ASSIGNMENT_PENDING",
     };
+    placedOrder.trackingSnapshot = createTrackingSnapshot(placedOrder);
 
     rememberPlacedOrder(placedOrder);
     setCheckoutDraft(null);
@@ -483,7 +605,9 @@ export function CartProvider({ children }) {
         assignment: assignment.assignment,
         assignmentStatus: "assigned",
         trackingStartedAt: Date.now(),
+        trackingStatus: "DRIVER_ASSIGNED",
       };
+      assignedOrder.trackingSnapshot = createTrackingSnapshot(assignedOrder);
 
       rememberPlacedOrder(assignedOrder);
 
@@ -503,6 +627,7 @@ export function CartProvider({ children }) {
           routeEstimate,
           estimatedDeliveryTime: `approx. ${deliveryEta.totalEtaMinutes} min`,
         };
+        assignedOrder.trackingSnapshot = createTrackingSnapshot(assignedOrder);
         rememberPlacedOrder(assignedOrder);
       } catch {
         console.warn("Route estimate unavailable; using the demo tracking route.");

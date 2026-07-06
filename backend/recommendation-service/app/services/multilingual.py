@@ -41,6 +41,35 @@ _ENGLISH_MARKERS = {
     "without",
 }
 
+_ENGLISH_LABELS = {
+    "beef": "beef",
+    "bowl": "bowl",
+    "burger": "burger",
+    "burrito": "burrito",
+    "chicken": "chicken",
+    "curry": "curry",
+    "doner": "doner",
+    "döner": "döner",
+    "falafel": "falafel",
+    "gluten-free": "gluten-free",
+    "halal": "halal",
+    "kebab": "kebab",
+    "noodle": "noodles",
+    "noodles": "noodles",
+    "pasta": "pasta",
+    "pho": "pho",
+    "pizza": "pizza",
+    "pork": "pork",
+    "ramen": "ramen",
+    "salad": "salad",
+    "spicy": "spicy",
+    "sushi": "sushi",
+    "turkish": "turkish",
+    "vegan": "vegan",
+    "vegetarian": "vegetarian",
+    "vietnamese": "vietnamese",
+}
+
 _GERMAN_LABELS = {
     "amerikanisch": "american",
     "asiatisch": "asian",
@@ -48,6 +77,9 @@ _GERMAN_LABELS = {
     "burger": "burger",
     "chinesisch": "chinese",
     "curry": "curry",
+    "doner": "doner",
+    "döner": "döner",
+    "falafel": "falafel",
     "gesund": "healthy",
     "glutenfrei": "gluten-free",
     "halal": "halal",
@@ -55,10 +87,14 @@ _GERMAN_LABELS = {
     "italienisch": "italian",
     "japanisch": "japanese",
     "koreanisch": "korean",
+    "kebab": "kebab",
     "mediterran": "mediterranean",
     "mexikanisch": "mexican",
     "nudeln": "noodles",
+    "rindfleisch": "beef",
     "pizza": "pizza",
+    "pho": "pho",
+    "phở": "pho",
     "preiswert": "cheap",
     "ramen": "ramen",
     "reis": "rice",
@@ -69,6 +105,7 @@ _GERMAN_LABELS = {
     "sushi": "sushi",
     "thailändisch": "thai",
     "türkisch": "turkish",
+    "vietnamesisch": "vietnamese",
     "vegan": "vegan",
     "vegane": "vegan",
     "veganes": "vegan",
@@ -83,31 +120,51 @@ _CHINESE_LABELS = {
     "中餐": "chinese",
     "中国菜": "chinese",
     "亚洲菜": "asian",
-    "健康": "healthy",
-    "便宜": "cheap",
-    "实惠": "cheap",
-    "寿司": "sushi",
     "意大利菜": "italian",
-    "披萨": "pizza",
-    "拉面": "ramen",
-    "无麸质": "gluten-free",
     "日本菜": "japanese",
-    "汉堡": "burger",
-    "泰国菜": "thai",
-    "清真": "halal",
-    "温暖": "warm",
-    "热乎": "warm",
-    "米饭": "rice",
-    "素食": "vegetarian",
-    "纯素": "vegan",
     "韩国菜": "korean",
-    "面条": "noodles",
     "印度菜": "indian",
     "墨西哥菜": "mexican",
     "土耳其菜": "turkish",
+    "土耳其": "turkish",
     "地中海菜": "mediterranean",
-    "辣": "spicy",
+    "泰国菜": "thai",
+    "越南河粉": "pho",
+    "越南菜": "vietnamese",
+    "越南": "vietnamese",
+    "河粉": "pho",
+    "牛肉": "beef",
+    "鸡肉": "chicken",
+    "猪肉": "pork",
+    "披萨": "pizza",
+    "拉面": "ramen",
+    "寿司": "sushi",
+    "汉堡": "burger",
     "咖喱": "curry",
+    "墨西哥卷饼": "burrito",
+    "墨西哥卷": "burrito",
+    "卷饼": "burrito",
+    "塔可": "taco",
+    "沙拉": "salad",
+    "碗饭": "bowl",
+    "碗": "bowl",
+    "面条": "noodles",
+    "面": "noodles",
+    "烤肉": "kebab",
+    "鹰嘴豆丸子": "falafel",
+    "法拉费": "falafel",
+    "素食": "vegetarian",
+    "纯素": "vegan",
+    "素": "vegetarian",
+    "清真": "halal",
+    "无麸质": "gluten-free",
+    "健康": "healthy",
+    "便宜": "cheap",
+    "实惠": "cheap",
+    "温暖": "warm",
+    "热乎": "warm",
+    "米饭": "rice",
+    "辣": "spicy",
 }
 
 _GERMAN_ALLERGENS = {
@@ -207,9 +264,11 @@ def detect_language(query: str | None, language_hint: str | None = None) -> str:
                 "italien",
                 "japan",
                 "möcht",
+                "rindfleisch",
                 "scharf",
                 "thail",
                 "türk",
+                "vietnames",
                 "vegan",
                 "vegetar",
             )
@@ -256,17 +315,14 @@ def extract_canonical_labels(query: str, language: str) -> list[str]:
         for phrase, canonical in sorted(_CHINESE_LABELS.items(), key=lambda item: -len(item[0])):
             if phrase in lowered:
                 labels.append(canonical)
+        labels.extend(_english_labels_from_text(lowered))
     elif language == "de":
         for token in re.findall(r"[a-zA-ZÀ-ÿ-]+", lowered):
             canonical = _german_label(token)
             if canonical:
                 labels.append(canonical)
     else:
-        labels.extend(
-            token
-            for token in re.findall(r"[a-z0-9-]+", lowered)
-            if len(token) > 2
-        )
+        labels.extend(_english_labels_from_text(lowered, keep_unknown=True))
     return _unique(labels)
 
 
@@ -308,6 +364,7 @@ def _merge_query_intent(
             "mexican",
             "thai",
             "turkish",
+            "vietnamese",
         }
     ]
     if dietary_labels:
@@ -376,12 +433,14 @@ def _german_label(value: str) -> str | None:
         "japan": "japanese",
         "korean": "korean",
         "mediterran": "mediterranean",
-        "mexikan": "mexican",
-        "nudel": "noodles",
-        "preiswert": "cheap",
-        "scharf": "spicy",
-        "thail": "thai",
-        "türk": "turkish",
+            "mexikan": "mexican",
+            "nudel": "noodles",
+            "rindfleisch": "beef",
+            "preiswert": "cheap",
+            "scharf": "spicy",
+            "thail": "thai",
+            "türk": "turkish",
+            "vietnames": "vietnamese",
         "vegan": "vegan",
         "vegetar": "vegetarian",
     }
@@ -389,6 +448,15 @@ def _german_label(value: str) -> str | None:
         if value.startswith(stem):
             return canonical
     return None
+
+
+def _english_labels_from_text(value: str, keep_unknown: bool = False) -> list[str]:
+    labels: list[str] = []
+    for token in re.findall(r"[a-z0-9-]+", value):
+        if len(token) <= 2:
+            continue
+        labels.append(_ENGLISH_LABELS.get(token, token) if keep_unknown else _ENGLISH_LABELS.get(token))
+    return [label for label in labels if label]
 
 
 def _normalize_price_label(value: Any, language: str) -> str:

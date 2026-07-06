@@ -13,6 +13,21 @@ public class FoodItemMapper {
             return null;
         }
 
+        String categoryName = null;
+        java.util.List<String> tags = new java.util.ArrayList<>();
+        if (foodItem.getCategory() != null) {
+            categoryName = foodItem.getCategory().getName();
+            tags.add(categoryName);
+            if (foodItem.getCategory().getDescription() != null) {
+                for (String part : foodItem.getCategory().getDescription().split(",")) {
+                    String trimmed = part.trim();
+                    if (!trimmed.isEmpty()) {
+                        tags.add(trimmed.toLowerCase());
+                    }
+                }
+            }
+        }
+
         return new FoodItemResponseDTO(
             foodItem.getId(),
             foodItem.getName(),
@@ -21,7 +36,9 @@ public class FoodItemMapper {
             foodItem.isAvailable(),
             foodItem.getPreparationTimeMinutes(),
             foodItem.getImageUrl(),
-            foodItem.getCategory() != null ? foodItem.getCategory().getId() : null
+            foodItem.getCategory() != null ? foodItem.getCategory().getId() : null,
+            categoryName,
+            tags
         );
     }
 

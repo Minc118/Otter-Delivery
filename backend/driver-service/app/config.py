@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     @property
     def normalized_repository_mode(self) -> str:
         mode = self.repository_mode.strip().lower()
+        if mode in {"database", "db", "supabase"}:
+            return "postgres"
         return mode if mode in {"auto", "memory", "postgres"} else "auto"
 
 

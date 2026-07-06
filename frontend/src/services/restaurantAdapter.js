@@ -1,25 +1,82 @@
 const CURRENCY = "EUR";
 
 const RESTAURANT_IMAGES = [
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCQFpQrYG4LpNRtVlfivKSl3ZheRPZ5TMzRJT2gGA-UHouXoQmZcStRnSpOVQszDPkN8009jor73icejL1cZ845YVJf8P-ZoJAuJ3T5tWezYTKuk-VktHr3e6ywT3zcwlEehA-dkaS7v00AIqTB8RJWtEbYjX6qttBqbL8ZZlGMr7e0f88hmQC2n4LVTOJ6wEEHXftC3-ACMXpj1y19K5tCY6OIKz1qb61vDasgGvJhhbAeEJRTRbaAw4fwDZf1k5iTgq0lzdlzYB8",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuA-lQs5K7n7zJdbm6-MaZ2qTx2e9H5HcTDpLbIabdp2Zick0JaCUH2ogRqK8NwT6mr10dydrKxTTHJsQFUpEjzVBnltTmYifLDYsb1KewsmEDp6s2xfRpZwDQb9v2rt4p-i97qDeDEzMpDWfdGGijyS6SIetuU5Gs_S-yQcZ0mc1Cby5GXUPKgEPMAujj9Ja7qkzGCuhU7Vnnk2MCp7ngLMxynpsOafPpV8_jmuOyLa8ToPEWtezpCmZtTPZYR9svmoIdZ9sESkWDA",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuD4tDnZ1-P6jHiJUhgAneI7osHNdC2c2IZ9_LhmRhOlQwahinAG5L3dpejECEFmiRYpDJIZLnYRDUH7cgjPKXaaz_7qO1WwpmDywFxoAJI59aZCvYn99jcdcWvvUr2M7JnvcU1JHgXc9nNgZ4n31fRHmpHW1NcY2j2zfrbW8s6QxPW-t9yNRaSynF_WGBNsmVaU6d7Mal5T8FRHnL2MQN9uCzXAW1l340UjDY_n4dkfM2Vq9GYNp3imoIqLQLTSm9rY3rXWwtBKwzs",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuB7kftjOB4DNU2AqzOvfQLUk8dnWple-b9SWyfJT2_mSGDBoinOnmrT0Z3MbBixnjYwP703r8ijxetBLdsTmSlNCruiv-FWY4evwZAYmap7EtG-F4lTw191PDDXKgvW2F22Goq44zL4FzQDYq_dteNeUoCQPVqTAciRXoADS_cQEApBnMIuMw8RQNMOrOUg7fIqSW4DiBxc8qoUDID7NKM6tefW89eIGPjiZ8c6bTP53dIPHkLmL7O0VsoqgB_pAiwae1M1NBXPfiU",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDIWhsPb7K0oWYUduk76iBbf-AdcjJjzzp1kABPhxBnb2Uk0DM13OcKszhC10G0HZ5krL7hGrp0srA_sCkJhZUxnKgbMVLLFyQ-0DoYBpjINiFpN5UnKq9yz0VcU-W3rD946CNTFBP-mvwq4Z96ZW5reS_kTas1cj-_8ladi4iaLYJx_yghxCrte-omzI3qWE13wRlI41f2irkkKO-3trOFqRZr6qTYj9KmeFBAUW88Rx8qxO8RUWkRgNUn-XBFMgPhtuCstsVeFR0",
+  "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80",
+  "https://images.pexels.com/photos/461198/pexels-photo-461198.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1200&q=80",
 ];
 
 const HERO_IMAGES = [
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDXMvw3jTewUzXTIrEt_gz8nDdBZMxyV6wK2RIwjW5p00_IrLmoqVEOOM5BLrNqGc5a2Rb6DirMIN3QOlhW3zR_F7Dh-2Bg5WF6WFb-Ym-Nq5GCw8eHw7LlwS2zwl1pwEwQ-L8rOsORZDW2b2KN8fv8gPpfP21m1wfV6ROHMiTKeTyrSjWirLGXzl4HCxLYvKXEoZlCIoA77pbpLpULvHpSDHLU4D7XazCEitmOHDRQa2SGeRtxO8fnRhFOeyYcypuenah5vU68BBs",
   ...RESTAURANT_IMAGES,
 ];
 
 const MENU_IMAGES = [
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCpxAakvMhynGTCftLJngM7xHbrkbL_qcRRpM98mxGqfZtl9CsHjkDK2i9ySjQrF1Ba37uEzIIOB1JrrXCxeNN9RpvFMt8G3GtXnwS3p1YnOk4tAPcLgcyZrWIk_pH180vR6ituD0Lyw5a9okVD8JhQfi6i-oN9CS48M8NnrhPjmjvE5yJ6xRH7sEHn5jpLNI_FRFxmkD_PJus_n-x_knMsxngDTHF9Uq4sjXjrExtmLtPfsVej0oKAvEhDgTQaBnAsDgLECkNhGCQ",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAVawCn0N0DmdgIYobUY8rbTz6fPu7o-d85E3pFocqJI9jvg02h3wOhkaIzCQ9Dg_s3ep3aLVlTrShNLfnvJ1N0YTOo9o7nuJYn0O2JE4OpbN6Xsbj6V-IriOItJZE-peNouml7QxDedFRb9SIDT2_x8hMS8XappTeZS5to2jJPeBRFjgjt-ehEW8rZ9GLYmo6hx3ZanNXDPC9VIjsMgyRrEhe8-zMnSuxsyr7vwuhtGtweo5CkBV9kQaxRHn5WdleX7Kc-ETtQWts",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAy_4z88Coqr90sFaDUsS2OTJzv8864zORyS8Mtq8hPdaZyCHBgzIuv7lPb1BacU92HggQf8Nh6_4_mPMj4Af3RCslwuyWBYWpuHWAP1a4wUHfAkiZSVUYEytqpKH_ItSBefrbC5kmMsgGq4DOYG2aIglAjlo37ZYB2awzTLyXJBhpvZopJlV_g1EgbR5l_2fJjmARcKMuCO1VbHYxsNN6vN830dzOQBlj7GtL_ESs8HIawo4VqvWKyJF8ZVFXHoOblqJGG1QIYAgY",
+  "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=1200&q=80",
+  "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  "https://images.pexels.com/photos/262959/pexels-photo-262959.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ...RESTAURANT_IMAGES,
 ];
 
+const LEGACY_MENU_ITEM_NAMES = new Map([
+  ["halal chicken döner plate", "Chicken Döner Plate"],
+  ["halal chicken doner plate", "Chicken Döner Plate"],
+  ["cheap falafel wrap", "Falafel Wrap"],
+  ["cheap lentil lunch bowl", "Lentil Lunch Bowl"],
+  ["gluten-free chicken quinoa bowl", "Chicken Quinoa Bowl"],
+  ["gluten free chicken quinoa bowl", "Chicken Quinoa Bowl"],
+  ["gluten-free corn taco trio", "Corn Taco Trio"],
+  ["gluten free corn taco trio", "Corn Taco Trio"],
+  ["healthy burrito bowl", "Burrito Bowl"],
+  ["halal shawarma plate", "Shawarma Plate"],
+  ["halal chicken shawarma bowl", "Shawarma Plate"],
+  ["chicken shawarma bowl", "Shawarma Plate"],
+  ["premium sushi box", "Sushi Selection"],
+  ["premium sashimi set", "Sashimi Set"],
+  ["bun bo noodles", "Beef Pho"],
+]);
+
 const CUISINE_RULES = [
+  {
+    label: "Turkish • Halal-friendly • Grill",
+    match: ["turkish", "döner", "doner", "kebab", "adana", "mezze"],
+  },
+  {
+    label: "Vietnamese • Pho • Noodles",
+    match: ["vietnamese", "pho", "bun bo", "rice noodle"],
+  },
+  {
+    label: "Korean • Bibimbap • Bowls",
+    match: ["korean", "bibimbap", "kimchi", "bulgogi", "tteokbokki"],
+  },
+  {
+    label: "Indian • Curry • Masala",
+    match: ["indian", "masala", "dal", "biryani", "paneer", "rogan", "chana"],
+  },
+  {
+    label: "Mexican • Tacos • Burritos",
+    match: ["mexican", "taco", "tacos", "burrito", "quesadilla", "nachos"],
+  },
+  {
+    label: "Mediterranean • Falafel • Bowls",
+    match: ["mediterranean", "falafel", "shawarma", "halloumi", "mezze"],
+  },
+  {
+    label: "Japanese • Ramen • Noodles",
+    match: ["ramen", "shoyu", "miso broth"],
+  },
+  {
+    label: "Japanese • Sushi • Premium",
+    match: ["sushi", "sashimi", "nigiri", "maki"],
+  },
+  {
+    label: "Thai • Noodles • Curry",
+    match: ["thai", "pad thai", "tom yum", "green curry"],
+  },
   {
     label: "Italian • Pizza • Authentic",
     match: ["pizza", "pasta", "napoli", "italian"],
@@ -29,16 +86,12 @@ const CUISINE_RULES = [
     match: ["burger", "fries", "shake"],
   },
   {
-    label: "Japanese • Sushi • Premium",
-    match: ["sushi", "ramen", "japanese"],
+    label: "Healthy • Gluten-Free • Bowls",
+    match: ["gluten-free"],
   },
   {
-    label: "Thai • Curry • Spicy",
-    match: ["thai", "curry", "spicy"],
-  },
-  {
-    label: "Healthy • Salad • Vegan Options",
-    match: ["salad", "bowl", "vegan", "vegetarian"],
+    label: "Healthy • Bowls • Salads",
+    match: ["gluten-free", "healthy", "salad", "bowl", "quinoa"],
   },
   {
     label: "Cafe • Bakery • Breakfast",
@@ -94,41 +147,87 @@ function isUsableImageUrl(source) {
 
 function normalizeImage(source, fallbackSrc, alt) {
   if (isUsableImageUrl(source)) {
-    return { alt, src: source };
+    return { alt, src: source, fallbackSrc };
   }
 
   if (isUsableImageUrl(source?.src)) {
     return {
       alt: source.alt ?? alt,
       src: source.src,
+      fallbackSrc: source.fallbackSrc ?? fallbackSrc,
     };
   }
 
-  return { alt, src: fallbackSrc };
+  return { alt, src: fallbackSrc, fallbackSrc };
+}
+
+export function applyImageFallback(event, fallbackSrc) {
+  if (!fallbackSrc || event.currentTarget.src === fallbackSrc) {
+    return;
+  }
+
+  event.currentTarget.src = fallbackSrc;
+}
+
+export function normalizeMenuItemName(name) {
+  const normalized = String(name ?? "")
+    .trim()
+    .toLowerCase();
+
+  return LEGACY_MENU_ITEM_NAMES.get(normalized) ?? name;
 }
 
 function inferCuisine(raw, menuItems) {
-  const text = textBlob(raw, menuItems);
-  const rule = CUISINE_RULES.find(({ match }) =>
-    match.some((term) => text.includes(term)),
-  );
+  if (raw?.cuisine || raw?.category) {
+    return raw.cuisine ?? raw.category;
+  }
 
-  return raw?.cuisine ?? raw?.category ?? rule?.label ?? "Local • Fresh • Favorites";
+  const restaurantText = textBlob(raw, []);
+  const directRule = CUISINE_RULES.find(({ match }) =>
+    match.some((term) => restaurantText.includes(term)),
+  );
+  if (directRule) {
+    return directRule.label;
+  }
+
+  const menuSupportedRule = CUISINE_RULES.find(({ label, match }) => {
+    const supportCount = countMatchingMenuItems(menuItems, match);
+    const needsMultipleItems = label.startsWith("Mediterranean") || label.startsWith("Italian");
+    return supportCount >= (needsMultipleItems ? 2 : 1);
+  });
+
+  return menuSupportedRule?.label ?? "Local • Fresh • Favorites";
 }
 
 function inferTags(raw, menuItems) {
+  const restaurantText = textBlob(raw, []);
   const text = textBlob(raw, menuItems);
+  const veganItems = countMatchingMenuItems(menuItems, ["vegan"]);
+  const vegetarianItems = countMatchingMenuItems(menuItems, ["vegetarian", "falafel", "paneer"]);
+  const spicyItems = countMatchingMenuItems(menuItems, ["spicy", "chili", "harissa", "gochujang"]);
+  const freshItems = countMatchingMenuItems(menuItems, ["salad", "bowl", "quinoa", "healthy"]);
   const tags = [];
 
   if (raw?.open !== false) tags.push("Open now");
-  if (text.includes("vegan")) tags.push("Vegan");
-  if (text.includes("vegetarian")) tags.push("Vegetarian");
-  if (text.includes("spicy")) tags.push("Spicy");
+  if (restaurantText.includes("vegan") || veganItems >= 2) tags.push("Vegan");
+  if (restaurantText.includes("vegetarian") || vegetarianItems >= 2) tags.push("Vegetarian");
+  if (restaurantText.includes("spicy") || spicyItems >= 2) tags.push("Spicy");
   if (text.includes("pizza") || text.includes("burger")) tags.push("Crowd pleaser");
-  if (text.includes("salad") || text.includes("bowl")) tags.push("Fresh picks");
+  if (restaurantText.includes("healthy") || freshItems >= 2) tags.push("Fresh picks");
   if (tags.length === 0) tags.push("Local favorite");
 
   return [...new Set(tags)].slice(0, 3);
+}
+
+function countMatchingMenuItems(menuItems, terms) {
+  return menuItems.filter((item) => {
+    const itemText = [item?.name, item?.description, item?.category]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return terms.some((term) => itemText.includes(term));
+  }).length;
 }
 
 function fallbackRating(raw) {
@@ -215,15 +314,7 @@ export function toRestaurantViewModel(rawRestaurant, options = {}) {
     open: rawRestaurant.open ?? rawRestaurant.available ?? true,
     featuredAction: rawRestaurant.featuredAction ?? true,
     mutedBody: rawRestaurant.mutedBody ?? hashString(name) % 4 === 0,
-    ribbon:
-      rawRestaurant.ribbon ??
-      (hashString(restaurantId) % 5 === 0
-        ? {
-            label: "AI Pick",
-            icon: "auto_awesome",
-            className: "bg-tertiary-fixed text-on-tertiary-fixed",
-          }
-        : null),
+    ribbon: rawRestaurant.ribbon ?? null,
     detail: {
       ...(rawRestaurant.detail ?? {}),
       name: rawRestaurant.detail?.name ?? name,
@@ -242,7 +333,7 @@ export function toMenuItemViewModel(rawMenuItem, restaurant = null) {
   );
   const menuItemId = String(rawMenuItem.menuItemId ?? rawMenuItem.foodItemId ?? rawMenuItem.id);
   const id = String(rawMenuItem.id ?? foodItemId);
-  const name = rawMenuItem.name ?? rawMenuItem.itemName ?? "Menu item";
+  const name = normalizeMenuItemName(rawMenuItem.name ?? rawMenuItem.itemName ?? "Menu item");
   const available = rawMenuItem.available ?? rawMenuItem.open ?? true;
   const price = rawMenuItem.price ?? rawMenuItem.amount ?? rawMenuItem.unitPrice;
   const image = normalizeImage(
@@ -281,7 +372,7 @@ export function toCartItemViewModel(menuItem) {
     foodItemId: menuItem.foodItemId ? String(menuItem.foodItemId) : undefined,
     menuItemId: menuItem.menuItemId ? String(menuItem.menuItemId) : undefined,
     restaurantId: menuItem.restaurantId ? String(menuItem.restaurantId) : undefined,
-    name: menuItem.name,
+    name: normalizeMenuItemName(menuItem.name),
     description: menuItem.description,
     image: menuItem.image,
     price: menuItem.price,
@@ -317,10 +408,12 @@ export function adaptRestaurants(rawRestaurants = []) {
 }
 
 export function adaptMenuItems(rawItems = [], restaurant = null) {
-  return rawItems.map((item, index) => ({
-    ...toMenuItemViewModel(item, restaurant),
-    aiRecommended: item.aiRecommended ?? index === 0,
-  }));
+  return rawItems
+    .filter((item) => item.available ?? item.open ?? true)
+    .map((item) => ({
+      ...toMenuItemViewModel(item, restaurant),
+      aiRecommended: item.aiRecommended ?? false,
+    }));
 }
 
 export function getFallbackRestaurantViewModel() {

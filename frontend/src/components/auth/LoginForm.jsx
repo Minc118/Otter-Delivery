@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   isProfileServiceUnavailable,
   login,
@@ -9,24 +9,34 @@ import Button from "../ui/Button.jsx";
 export default function LoginForm() {
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = getSafeReturnPath(searchParams.get("returnTo"));
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (isSubmitting) {
+      return;
+    }
+
     setError("");
+    setIsSubmitting(true);
 
     try {
       const profile = await login(username);
 
       localStorage.setItem("profile", JSON.stringify(profile));
 
-      navigate("/");
+      navigate(returnTo ?? "/");
     } catch (error) {
       setError(
         isProfileServiceUnavailable(error)
           ? "Profile service is currently unavailable"
           : "Profile not found",
       );
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -76,9 +86,10 @@ export default function LoginForm() {
           <div className="pt-stack-sm">
             <Button
                 className="w-full hover:bg-[#3A5B59] py-4 rounded-lg"
+                disabled={isSubmitting}
                 type="submit"
             >
-              <span>Sign in</span>
+              <span>{isSubmitting ? "Signing in" : "Sign in"}</span>
               <span className="material-symbols-outlined text-[20px]">
               arrow_forward
             </span>
@@ -99,4 +110,12 @@ export default function LoginForm() {
         </div>
       </div>
   );
+}
+
+function getSafeReturnPath(path) {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return null;
+  }
+
+  return path;
 }

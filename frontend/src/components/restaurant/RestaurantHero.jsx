@@ -1,3 +1,5 @@
+import { applyImageFallback } from "../../services/restaurantAdapter.js";
+
 export default function RestaurantHero({ restaurant }) {
   const detail = restaurant.detail ?? {};
   const name = detail.name ?? restaurant.name;
@@ -13,6 +15,7 @@ export default function RestaurantHero({ restaurant }) {
         <img
           alt={heroImage.alt}
           className="w-full h-full object-cover"
+          onError={(event) => applyImageFallback(event, heroImage.fallbackSrc)}
           src={heroImage.src}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />

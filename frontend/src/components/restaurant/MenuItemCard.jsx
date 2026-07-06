@@ -1,88 +1,91 @@
 import useCart from "../../hooks/useCart.js";
 import {
-  toCartItemViewModel,
-  toRestaurantCartMeta,
+    applyImageFallback,
+    toCartItemViewModel,
+    toRestaurantCartMeta,
 } from "../../services/restaurantAdapter.js";
+import { getRecommendationAttributionForRestaurant } from "../../services/recommendationService.js";
 
 export default function MenuItemCard({ item, restaurant }) {
-  const { addItem } = useCart();
+    const { addItem } = useCart();
 
-  const restaurantName = restaurant?.name ?? "Restaurant";
-  const restaurantId = restaurant?.id ?? "unknown";
-  const restaurantMeta = toRestaurantCartMeta(restaurant);
+    const restaurantName = restaurant?.name ?? "Green Bowl House";
+    const restaurantId =
+        restaurant?.restaurantId ?? restaurant?.id ?? "green-bowl-house";
+    const restaurantMeta = toRestaurantCartMeta(restaurant);
 
-  const imageUrl =
-      item?.imageUrl ||
-      item?.image?.src ||
-      "https://via.placeholder.com/300x200";
+    // Teammate's feature tracking logic
+    const recommendationAttribution =
+        getRecommendationAttributionForRestaurant(restaurantId);
 
-  const cardClass = item.aiRecommended
-      ? "bg-surface-light border border-surface-light"
-      : "bg-surface-container-lowest border border-surface hover:border-primary-light";
+    // Unified robust image source matching
+    const imageUrl =
+        item?.image?.src ||
+        item?.imageUrl ||
+        "https://via.placeholder.com/300x200";
 
-  return (
-      <article className={`${cardClass} rounded-xl overflow-hidden flex flex-col`}>
-        {item.aiRecommended && (
-            <div className="absolute top-4 left-4 z-10 bg-[#FFD278] px-3 py-1 rounded-full">
-              AI Recommended
+    const cardClass = item.aiRecommended
+        ? "bg-surface-light border border-surface-light"
+        : "bg-surface-container-lowest border border-surface hover:border-primary-light";
+
+    return (
+        <article
+            className={`${cardClass} rounded-xl overflow-hidden hover:shadow-[0_12px_32px_rgba(36,36,38,0.08)] transition-all duration-300 flex flex-col relative`}
+        >
+            {item.aiRecommended && (
+                <div className="absolute top-4 left-4 z-10 bg-[#FFD278] text-dark-text font-metadata text-metadata px-3 py-1 rounded-full flex items-center gap-1">
+          <span className="material-symbols-outlined text-[16px]">
+            auto_awesome
+          </span>
+                    AI Recommended
+                </div>
+            )}
+
+            <div className="h-48 overflow-hidden">
+                <img
+                    alt={item?.image?.alt || item.name}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                    onError={(event) => applyImageFallback(event, item?.image?.fallbackSrc)}
+                    src={imageUrl}
+                />
             </div>
-        )}
 
-        <div className="h-48 overflow-hidden">
-          <img
-              alt={item.name}
-              src={imageUrl}
-              className="w-full h-full object-cover"
-          />
-        </div>
+            <div className="p-4 flex flex-col flex-grow">
+                <div className="flex justify-between items-start gap-4 mb-2">
+                    <h3 className="font-card-title text-card-title text-on-background">
+                        {item.name}
+                    </h3>
+                    <span className="font-card-title text-card-title text-on-background shrink-0">
+            {item.price}€
+          </span>
+                </div>
 
-        <div className="p-4 flex flex-col flex-grow">
-          <div className="flex justify-between mb-2">
-            <h3>{item.name}</h3>
-            <span>{item.price}€</span>
-          </div>
+                <p className="text-on-surface-variant mb-4 flex-grow">
+                    {item.description}
+                </p>
 
-          <p className="text-sm text-gray-500 mb-4">{item.description}</p>
-
-          {/*<button*/}
-          {/*    onClick={() =>*/}
-          {/*        addItem({*/}
-          {/*          restaurantId,*/}
-          {/*          restaurantName,*/}
-          {/*          restaurantMeta,*/}
-          {/*          item: {*/}
-          {/*            ...toCartItemViewModel(item),*/}
-          {/*            restaurantId,*/}
-          {/*            restaurantName,*/}
-          {/*            restaurantMeta,*/}
-          {/*          },*/}
-          {/*        })*/}
-          {/*    }*/}
-          {/*>*/}
-          {/*  Add to cart*/}
-          {/*</button>*/}
-            <button
-                onClick={() =>
-                    addItem({
-                        restaurantId,
-                        restaurantName,
-                        restaurantMeta,
-                        item: {
-                            ...toCartItemViewModel(item),
+                <button
+                    className="bg-primary-container hover:bg-surface-tint text-on-primary font-button text-button py-3 px-4 rounded-[16px] transition-colors duration-200 w-full flex justify-center items-center gap-2"
+                    onClick={() =>
+                        addItem({
                             restaurantId,
                             restaurantName,
                             restaurantMeta,
-                        },
-                    })
-                }
-                className="mt-auto w-full bg-primary-container hover:bg-surface-tint text-on-primary font-button text-button rounded-lg py-3 transition-colors duration-200 flex items-center justify-center gap-2"
-            >
-    <span className="material-symbols-outlined text-[20px]">
-        add
-    </span>
-                Add to cart
-            </button>
-        </div>
-      </article>
-  );
+                            recommendationAttribution, // Keeps teammate analytics alive
+                            item: {
+                                ...toCartItemViewModel(item),
+                                restaurantId,
+                                restaurantName,
+                                restaurantMeta,
+                            },
+                        })
+                    }
+                    type="button"
+                >
+                    Add to cart
+                    <span className="material-symbols-outlined">add</span>
+                </button>
+            </div>
+        </article>
+    );
 }

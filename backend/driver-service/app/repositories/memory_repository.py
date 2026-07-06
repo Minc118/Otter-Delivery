@@ -13,6 +13,7 @@ from app.models import (
     RouteEstimate,
     TrackingEvent,
     TrackingResponse,
+    TrackingSnapshot,
 )
 
 
@@ -38,6 +39,8 @@ class MemoryDriverRepository:
         self._assignments: dict[str, DeliveryAssignment] = {}
         self._events: dict[str, list[TrackingEvent]] = {}
         self._estimates: dict[str, RouteEstimate] = {}
+        self._snapshots: dict[str, list[TrackingSnapshot]] = {}
+        self._status_events: dict[str, list[TrackingEvent]] = {}
         if seed_demo_drivers:
             self._seed()
 
@@ -85,6 +88,7 @@ class MemoryDriverRepository:
                 }
             )
             self._drivers[driver_id] = updated
+            self._record_position_tracking(updated)
             return deepcopy(updated)
 
     def assign_driver(
@@ -142,13 +146,39 @@ class MemoryDriverRepository:
             self._drivers[driver.driver_id] = assigned_driver
             self._assignments[order_id] = assignment
             self._events[order_id] = [event]
+            self._status_events[order_id] = [
+                TrackingEvent(
+                    event_id=str(uuid4()),
+                    order_id=order_id,
+                    assignment_id=assignment.assignment_id,
+                    driver_id=driver.driver_id,
+                    event_type="DELIVERY_STATUS_CHANGED",
+                    message="Delivery status changed to ASSIGNED.",
+                    location=driver.current_location,
+                    created_at=now,
+                )
+            ]
+            self._snapshots[order_id] = [
+                TrackingSnapshot(
+                    snapshot_id=str(uuid4()),
+                    order_id=order_id,
+                    assignment_id=assignment.assignment_id,
+                    driver_id=driver.driver_id,
+                    status=assignment.status,
+                    driver_location=driver.current_location,
+                    metadata={"source": "assignment"},
+                    created_at=now,
+                )
+            ]
             return deepcopy(assignment), deepcopy(assigned_driver), True
 
     def get_tracking(self, order_id: str) -> TrackingResponse:
         with self._lock:
             assignment = self._assignments.get(order_id)
             events = self._events.get(order_id, [])
-            if assignment is None and not events:
+            latest_snapshot = self._latest_snapshot(order_id)
+            latest_route_estimate = self._latest_route_estimate(order_id)
+            if assignment is None and not events and latest_snapshot is None and latest_route_estimate is None:
                 raise NotFoundError(
                     "TRACKING_NOT_FOUND", "Order tracking data could not be found."
                 )
@@ -156,9 +186,132 @@ class MemoryDriverRepository:
                 order_id=order_id,
                 assignment=deepcopy(assignment),
                 events=deepcopy(events),
+                latest_snapshot=deepcopy(latest_snapshot),
+                latest_route_estimate=deepcopy(latest_route_estimate),
             )
 
     def save_route_estimate(self, estimate: RouteEstimate) -> RouteEstimate:
         with self._lock:
             self._estimates[estimate.estimate_id] = deepcopy(estimate)
+            if estimate.order_id:
+                assignment = self._assignments.get(estimate.order_id)
+                self._snapshots.setdefault(estimate.order_id, []).append(
+                    TrackingSnapshot(
+                        snapshot_id=str(uuid4()),
+                        order_id=estimate.order_id,
+                        assignment_id=assignment.assignment_id if assignment else None,
+                        driver_id=estimate.driver_id,
+                        status=assignment.status if assignment else None,
+                        pickup_location=estimate.origin_location,
+                        dropoff_location=estimate.destination_location,
+                        route_estimate_id=estimate.estimate_id,
+                        route_provider=estimate.provider,
+                        eta_seconds=estimate.duration_seconds,
+                        route_points=deepcopy(estimate.route_points),
+                        encoded_polyline=estimate.encoded_polyline,
+                        metadata={"source": "route_estimate"},
+                        created_at=estimate.created_at,
+                    )
+                )
             return deepcopy(estimate)
+
+    def update_assignment_status(
+        self, order_id: str, status: str, message: str | None = None
+    ) -> TrackingResponse:
+        with self._lock:
+            assignment = self._assignments.get(order_id)
+            if assignment is None:
+                raise NotFoundError(
+                    "TRACKING_NOT_FOUND", "Order tracking data could not be found."
+                )
+
+            next_status = AssignmentStatus(status)
+            now = utc_now()
+            update = {"status": next_status, "updated_at": now}
+            if next_status == AssignmentStatus.PICKED_UP:
+                update["picked_up_at"] = assignment.picked_up_at or now
+            if next_status == AssignmentStatus.DELIVERED:
+                update["delivered_at"] = assignment.delivered_at or now
+
+            updated_assignment = assignment.model_copy(update=update)
+            self._assignments[order_id] = updated_assignment
+
+            driver = self._drivers.get(updated_assignment.driver_id)
+            driver_location = driver.current_location if driver else None
+            event = TrackingEvent(
+                event_id=str(uuid4()),
+                order_id=order_id,
+                assignment_id=updated_assignment.assignment_id,
+                driver_id=updated_assignment.driver_id,
+                event_type="DELIVERY_STATUS_CHANGED",
+                message=message or f"Delivery status changed to {next_status.value}.",
+                location=driver_location,
+                created_at=now,
+            )
+            self._events.setdefault(order_id, []).append(event)
+            self._status_events.setdefault(order_id, []).append(deepcopy(event))
+            self._snapshots.setdefault(order_id, []).append(
+                TrackingSnapshot(
+                    snapshot_id=str(uuid4()),
+                    order_id=order_id,
+                    assignment_id=updated_assignment.assignment_id,
+                    driver_id=updated_assignment.driver_id,
+                    status=next_status,
+                    driver_location=driver_location,
+                    metadata={"source": "status_update"},
+                    created_at=now,
+                )
+            )
+
+            if next_status in {AssignmentStatus.DELIVERED, AssignmentStatus.CANCELLED} and driver:
+                self._drivers[driver.driver_id] = driver.model_copy(
+                    update={"status": DriverStatus.AVAILABLE, "updated_at": now}
+                )
+
+            return self.get_tracking(order_id)
+
+    def _record_position_tracking(self, driver: Driver) -> None:
+        now = utc_now()
+        active_statuses = {
+            AssignmentStatus.ASSIGNED,
+            AssignmentStatus.PICKED_UP,
+            AssignmentStatus.IN_TRANSIT,
+        }
+        for assignment in self._assignments.values():
+            if assignment.driver_id != driver.driver_id or assignment.status not in active_statuses:
+                continue
+            event = TrackingEvent(
+                event_id=str(uuid4()),
+                order_id=assignment.order_id,
+                assignment_id=assignment.assignment_id,
+                driver_id=driver.driver_id,
+                event_type="DRIVER_POSITION_UPDATED",
+                message="Driver position updated.",
+                location=driver.current_location,
+                created_at=now,
+            )
+            self._events.setdefault(assignment.order_id, []).append(event)
+            self._snapshots.setdefault(assignment.order_id, []).append(
+                TrackingSnapshot(
+                    snapshot_id=str(uuid4()),
+                    order_id=assignment.order_id,
+                    assignment_id=assignment.assignment_id,
+                    driver_id=driver.driver_id,
+                    status=assignment.status,
+                    driver_location=driver.current_location,
+                    metadata={"source": "driver_position"},
+                    created_at=now,
+                )
+            )
+
+    def _latest_snapshot(self, order_id: str) -> TrackingSnapshot | None:
+        snapshots = self._snapshots.get(order_id, [])
+        return snapshots[-1] if snapshots else None
+
+    def _latest_route_estimate(self, order_id: str) -> RouteEstimate | None:
+        estimates = [
+            estimate for estimate in self._estimates.values() if estimate.order_id == order_id
+        ]
+        if not estimates:
+            return None
+        return max(estimates, key=lambda estimate: estimate.created_at)

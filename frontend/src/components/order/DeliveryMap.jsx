@@ -330,10 +330,10 @@ function TrackingMapUnavailablePanel() {
           map
         </span>
         <h2 className="font-section-title text-section-title text-on-surface">
-          Route information pending
+          Route snapshot unavailable
         </h2>
         <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
-          Tracking map will appear once route information is available.
+          This older order does not include saved route geometry. New orders keep a route snapshot for order history.
         </p>
       </div>
     </div>

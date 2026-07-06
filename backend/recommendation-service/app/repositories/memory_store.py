@@ -8,6 +8,7 @@ PREFERENCES: dict[str, dict] = {}
 HISTORY: list[dict] = []
 FEEDBACK: list[dict] = []
 TRAINING_EVENTS: list[dict] = []
+RECOMMENDATION_EVENTS: list[dict] = []
 
 
 def now_iso() -> str:
@@ -45,3 +46,9 @@ def save_training_events(records: list[dict]) -> None:
     timestamp = now_iso()
     for record in records:
         TRAINING_EVENTS.append({"id": str(uuid4()), "created_at": timestamp, **record})
+
+
+def save_recommendation_event(record: dict) -> dict:
+    stored = {"id": str(uuid4()), "created_at": now_iso(), **record}
+    RECOMMENDATION_EVENTS.insert(0, stored)
+    return stored

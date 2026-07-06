@@ -4,8 +4,6 @@ import {
   normalizeRoutePoint,
 } from "./routeGeometry.js";
 
-const DELIVERED_STORAGE_GRACE_PERIOD_MS = 15 * 60 * 1000;
-const PENDING_STORAGE_GRACE_PERIOD_MS = 2 * 60 * 60 * 1000;
 const RECENT_ACTIVE_ORDER_GRACE_PERIOD_MS = 15 * 60 * 1000;
 
 export function getTrackedDeliveryOrder(order) {
@@ -83,16 +81,17 @@ export function getTrackedDeliveryOrders(orders) {
 }
 
 function getLocalTrackedDeliveryOrder(order) {
+  const snapshot = order?.trackingSnapshot ?? {};
   const id = normalizeId(order?.id ?? order?.orderId);
   const assignmentStatus = normalizeAssignmentStatus(order?.assignmentStatus);
-  const pickupLocation = normalizeRoutePoint(order?.pickupLocation);
+  const pickupLocation = normalizeRoutePoint(order?.pickupLocation ?? snapshot.pickupLocation);
   const deliveryLocation = normalizeRoutePoint(
-    order?.deliveryLocation ?? toDeliveryLocation(order?.deliveryAddress),
+    order?.deliveryLocation ?? snapshot.deliveryLocation ?? toDeliveryLocation(order?.deliveryAddress),
   );
   const routePoints = getRoutePoints({
     pickupLocation,
     deliveryLocation,
-    routePoints: order?.routePoints,
+    routePoints: order?.routePoints ?? snapshot.routePoints,
   });
 
   if (!id || !assignmentStatus) {
@@ -114,14 +113,13 @@ function getLocalTrackedDeliveryOrder(order) {
 export function sanitizeTrackedOrdersById(
   storedOrders,
   activeOrderId,
-  now = Date.now(),
 ) {
   if (!storedOrders || typeof storedOrders !== "object") {
     return {};
   }
 
   return Object.values(storedOrders).reduce((ordersById, order) => {
-    const sanitizedOrder = sanitizeTrackedOrder(order, activeOrderId, now);
+    const sanitizedOrder = sanitizeTrackedOrder(order);
     if (sanitizedOrder) {
       ordersById[String(sanitizedOrder.id)] = sanitizedOrder;
     }
@@ -147,7 +145,7 @@ export function isRecentActiveTrackedOrder(
   );
 }
 
-function sanitizeTrackedOrder(order, activeOrderId, now) {
+function sanitizeTrackedOrder(order) {
   if (!order || typeof order !== "object") {
     return null;
   }
@@ -157,26 +155,8 @@ function sanitizeTrackedOrder(order, activeOrderId, now) {
   const trackingStartedAt = normalizeTimestamp(order.trackingStartedAt);
   const deliveredAt = normalizeTimestamp(order.deliveredAt);
   const assignmentStatus = normalizeAssignmentStatus(order.assignmentStatus);
-  const isActiveOrder = id && String(activeOrderId) === id;
 
   if (!id || !assignmentStatus || (!createdAt && !trackingStartedAt)) {
-    return null;
-  }
-
-  if (
-    deliveredAt &&
-    now - deliveredAt > DELIVERED_STORAGE_GRACE_PERIOD_MS &&
-    !isActiveOrder
-  ) {
-    return null;
-  }
-
-  if (
-    ["pending", "failed"].includes(assignmentStatus) &&
-    createdAt &&
-    now - createdAt > PENDING_STORAGE_GRACE_PERIOD_MS &&
-    !isActiveOrder
-  ) {
     return null;
   }
 

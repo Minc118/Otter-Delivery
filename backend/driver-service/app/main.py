@@ -1,4 +1,5 @@
 import psycopg
+import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +14,18 @@ from app.routes.drivers import router as drivers_router
 from app.routes.health import router as health_router
 from app.routes.tracking import router as tracking_router
 
+logger = logging.getLogger(__name__)
+
+FRONTEND_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "https://otter-delivery.vercel.app",
+]
+VERCEL_PREVIEW_ORIGIN_REGEX = r"https://.*\.vercel\.app"
+FRONTEND_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+FRONTEND_CORS_HEADERS = ["Content-Type", "Authorization", "Accept", "Origin"]
+
 
 def create_app(
     repository: DriverRepository | None = None,
@@ -26,10 +39,11 @@ def create_app(
     application.state.settings = active_settings
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_origins=FRONTEND_CORS_ORIGINS,
+        allow_origin_regex=VERCEL_PREVIEW_ORIGIN_REGEX,
+        allow_credentials=False,
+        allow_methods=FRONTEND_CORS_METHODS,
+        allow_headers=FRONTEND_CORS_HEADERS,
     )
 
     @application.exception_handler(ServiceError)
@@ -57,10 +71,20 @@ def create_app(
 
 
 def _build_repository(settings: Settings) -> DriverRepository:
-    if settings.normalized_repository_mode == "memory":
+    mode = settings.normalized_repository_mode
+    if mode == "memory":
         return MemoryDriverRepository()
+    if mode == "postgres":
+        if not settings.effective_database_url:
+            raise RuntimeError(
+                "DRIVER_REPOSITORY_MODE requires DRIVER_DATABASE_URL or DATABASE_URL."
+            )
+        return PostgresDriverRepository(settings.effective_database_url)
     if settings.effective_database_url:
         return PostgresDriverRepository(settings.effective_database_url)
+    logger.warning(
+        "Driver Service started in memory repository mode because no database URL is configured."
+    )
     return MemoryDriverRepository()
 
 

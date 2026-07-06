@@ -15,6 +15,7 @@ def create_request_with_results(
     free_text: str | None,
     request_preferences: dict[str, Any],
     stored_preferences: dict[str, Any],
+    normalized_intent: dict[str, Any] | None = None,
     restaurant_service_url: str,
     recommendations: list[dict[str, Any]],
 ) -> tuple[models.RecommendationRequest, list[models.RecommendationResult]]:
@@ -24,6 +25,7 @@ def create_request_with_results(
         free_text=free_text,
         request_preferences=request_preferences,
         stored_preferences=stored_preferences,
+        normalized_intent=normalized_intent or {},
         restaurant_service_url=restaurant_service_url,
     )
     db.add(request)
@@ -178,3 +180,33 @@ def create_training_events(
     for row in rows:
         db.refresh(row)
     return rows
+
+
+def create_recommendation_event(
+    db: Session,
+    *,
+    request_id: UUID | None,
+    profile_id: str | None,
+    restaurant_id: str | None,
+    event_type: str,
+    order_id: str | None,
+    metadata: dict[str, Any],
+) -> models.RecommendationEvent:
+    event = models.RecommendationEvent(
+        request_id=request_id,
+        profile_id=profile_id,
+        restaurant_id=restaurant_id,
+        event_type=event_type,
+        order_id=order_id,
+        event_metadata=metadata,
+    )
+    db.add(event)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    db.refresh(event)
+    return event
