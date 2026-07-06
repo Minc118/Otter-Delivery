@@ -11,16 +11,37 @@ export default function OrderSuccessPage() {
   const { lastPlacedOrder } = useCart();
   const fallbackOrder = createPlacedOrderFromTrackingOrder(getOrderById(id));
   const order = lastPlacedOrder?.id === id ? lastPlacedOrder : fallbackOrder;
-  const itemsSubtotalCents = order.items.reduce(
-    (total, item) => total + item.quantity * item.unitPriceCents,
-    0,
-  );
-  const feesCents = order.totalCents - itemsSubtotalCents;
 
   useEffect(() => {
     document.title = "Order Placed - Otter Delivery";
   }, []);
 
+  if (!order) {
+    return (
+      <div className="bg-background min-h-screen">
+        <PageShell className="py-stack-lg flex min-h-[calc(100vh-80px)] items-center justify-center">
+          <div className="max-w-md text-center">
+            <span className="material-symbols-outlined mb-4 text-5xl text-error">
+              error
+            </span>
+            <h1 className="font-page-title text-page-title text-on-surface">
+              Order not found
+            </h1>
+            <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
+              We could not find this order receipt.
+            </p>
+          </div>
+        </PageShell>
+      </div>
+    );
+  }
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemsSubtotalCents = items.reduce(
+    (total, item) => total + item.quantity * item.unitPriceCents,
+    0,
+  );
+  const feesCents = order.totalCents - itemsSubtotalCents;
   const assignmentMessage = getAssignmentMessage(order);
 
   return (
@@ -79,7 +100,7 @@ export default function OrderSuccessPage() {
               Order Summary
             </h3>
             <ul className="space-y-3">
-              {order.items.map((item) => (
+              {items.length > 0 ? items.map((item) => (
                 <li
                   className="flex justify-between items-center gap-4"
                   key={item.id}
@@ -91,7 +112,11 @@ export default function OrderSuccessPage() {
                     {formatCurrency(item.quantity * item.unitPriceCents)}
                   </span>
                 </li>
-              ))}
+              )) : (
+                <li className="text-on-surface-variant">
+                  Order items unavailable
+                </li>
+              )}
               <li className="flex justify-between items-center pt-3 border-t border-surface-variant border-dashed mt-3">
                 <span className="text-on-surface font-metadata text-metadata">
                   Delivery & Fees

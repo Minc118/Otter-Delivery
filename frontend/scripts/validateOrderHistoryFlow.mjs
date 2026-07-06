@@ -4,6 +4,8 @@ import {
   toHistoryOrder,
 } from "../src/services/orderHistoryService.js";
 import { getLatestOrderStatusMeta } from "../src/services/orderStatus.js";
+import { createPlacedOrderFromTrackingOrder } from "../src/services/checkoutService.js";
+import { getOrderById } from "../src/services/orderService.js";
 
 const cartContextSource = readFileSync(
   new URL("../src/context/CartContext.jsx", import.meta.url),
@@ -137,6 +139,12 @@ assert(
   "OrderTrackingPage must handle order not found fallback when the order is not in static or local tracked lists.",
 );
 assert(
+  trackingPageSource.includes("const isOrderNotFound = !order;") &&
+    trackingPageSource.includes("disabled: trackingUnavailable || !baseOrder") &&
+    trackingPageSource.includes("const order = baseOrder"),
+  "OrderTrackingPage must render its unavailable state before item-rendering components can read from a null order.",
+);
+assert(
   trackingPageSource.includes("isTrackingNotFoundError"),
   "OrderTrackingPage must detect tracking not found errors and mark them unavailable.",
 );
@@ -148,8 +156,13 @@ assert(
 assert(
   trackingPageSource.includes("const isNumericRouteId = isNumericOrderId(id);") &&
     trackingPageSource.includes("const staticFallbackOrder = isNumericRouteId ? null : getOrderById(id);") &&
-    trackingPageSource.includes("const isOrderNotFound = !storedOrder && !staticFallbackOrder;"),
+    trackingPageSource.includes("const isOrderNotFound = !order;"),
   "OrderTrackingPage must prevent static/mock fallback for concrete numeric /orders/:id/tracking routes.",
+);
+assert(
+  trackingPageSource.includes("items: Array.isArray(baseOrder.items) ? baseOrder.items : []") &&
+    trackingPageSource.includes("items: Array.isArray(storedOrder.items) ? storedOrder.items : []"),
+  "OrderTrackingPage must render missing order items as an empty list instead of reading .items from null or assuming items exists.",
 );
 assert(
   trackingPageSource.includes("liveTrackingMissing") &&
@@ -203,6 +216,18 @@ assert(
   cartContextSource.includes('trackingStatus: "tracking_unavailable"') &&
     cartContextSource.includes('assignmentStatus: "tracking_unavailable"'),
   "CartContext must persist tracking_unavailable status in local tracked orders when tracking is lost."
+);
+
+const missingOrder = getOrderById("999999");
+assert(missingOrder === null, "getOrderById must return null for unknown order ids.");
+assert(
+  createPlacedOrderFromTrackingOrder(missingOrder) === null,
+  "Missing getOrderById results must be safe for receipt/order rendering helpers.",
+);
+assert(
+  !trackingPageSource.includes("const staticFallbackOrder = getOrderById(id);") &&
+    !trackingPageSource.includes("staticFallbackOrder ?? getOrderById"),
+  "Numeric /orders/:id/tracking routes must not use static fallback order data.",
 );
 
 const simulationSource = readFileSync(
