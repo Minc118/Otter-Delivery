@@ -182,7 +182,12 @@ export function createMockPlacedOrder({
 }
 
 export function createPlacedOrderFromTrackingOrder(order) {
-  const subtotalCents = order.items.reduce(
+  if (!order) {
+    return null;
+  }
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const subtotalCents = items.reduce(
     (total, item) => total + item.quantity * item.unitPriceCents,
     0,
   );
@@ -193,7 +198,7 @@ export function createPlacedOrderFromTrackingOrder(order) {
     restaurantId: order.restaurant.name.toLowerCase().replace(/\s+/g, "-"),
     restaurantName: order.restaurant.name,
     restaurantImage: order.restaurant.image,
-    items: order.items,
+    items,
     subtotalCents,
     deliveryFeeCents: order.deliveryFeeCents,
     totalCents: subtotalCents + order.deliveryFeeCents + order.serviceFeeCents,

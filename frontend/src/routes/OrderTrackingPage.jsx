@@ -47,13 +47,16 @@ export default function OrderTrackingPage() {
     tracking,
   });
   const simulation = useDeliverySimulation(baseOrder, {
-    disabled: trackingUnavailable,
+    disabled: trackingUnavailable || !baseOrder,
   });
-  const order = {
-    ...baseOrder,
-    ...simulation,
-    routeProgress: simulation?.routeProgress ?? baseOrder?.routeProgress ?? 0,
-  };
+  const order = baseOrder
+    ? {
+        ...baseOrder,
+        ...simulation,
+        items: Array.isArray(baseOrder.items) ? baseOrder.items : [],
+        routeProgress: simulation?.routeProgress ?? baseOrder.routeProgress ?? 0,
+      }
+    : null;
   const canShowRouteMap = !trackingUnavailable && hasRouteMap(order);
 
   useEffect(() => {
@@ -113,7 +116,7 @@ export default function OrderTrackingPage() {
     }
   }, [id, markDeliveryDelivered, simulation, storedOrder]);
 
-  const isOrderNotFound = !storedOrder && !staticFallbackOrder;
+  const isOrderNotFound = !order;
 
   if (isOrderNotFound) {
     return (
@@ -258,7 +261,7 @@ function getTrackingOrder({
       name: storedOrder.restaurantName,
       image: storedOrder.restaurantImage,
     },
-    items: storedOrder.items,
+    items: Array.isArray(storedOrder.items) ? storedOrder.items : [],
     deliveryFeeCents: storedOrder.deliveryFeeCents,
     serviceFeeCents: 0,
   };
