@@ -28,17 +28,7 @@ services:
       - recommendation-service
       - translation-service
 
-#
-#  restaurant-service:
-#    platform: linux/amd64
-#    build:
-#      context: ./backend/restaurant-service
-#    ports:
-#      - "${RESTAURANT_SERVICE_PORT:-8001}:8001"
-#    environment:
-#      SPRING_PROFILES_ACTIVE: dev
-#      SEED_DEMO_DATA: "true"
-#      SERVER_PORT: 8001
+
   restaurant-service:
     platform: linux/amd64
     build:
@@ -49,9 +39,10 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SEED_DEMO_DATA: "true"
       SERVER_PORT: 8001
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      RESTAURANT_DATABASE_URL: ${RESTAURANT_DATABASE_URL}
+      RESTAURANT_DATABASE_USERNAME: ${RESTAURANT_DATABASE_USERNAME}
+      RESTAURANT_DATABASE_PASSWORD: ${RESTAURANT_DATABASE_PASSWORD}
+
 
   order-service:
     build:
@@ -61,9 +52,12 @@ services:
     environment:
       SERVER_PORT: 8002
       RESTAURANT_SERVICE_URL: http://restaurant-service:8001
+      # Added isolated database credentials for the Order Service
+      ORDER_DATABASE_URL: ${ORDER_DATABASE_URL}
+      ORDER_DATABASE_USERNAME: ${ORDER_DATABASE_USERNAME}
+      ORDER_DATABASE_PASSWORD: ${ORDER_DATABASE_PASSWORD}
     depends_on:
       - restaurant-service
-
 
   driver-service:
     build:
