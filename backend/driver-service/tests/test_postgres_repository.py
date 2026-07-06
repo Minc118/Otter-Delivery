@@ -66,6 +66,30 @@ def test_postgres_assignment_persists_assignment_status_event_and_snapshot() -> 
     assert "INSERT INTO driver_tracking_snapshots" in executed_sql
 
 
+def test_postgres_assignment_uses_demo_fallback_when_pool_is_exhausted() -> None:
+    cursor = FakeCursor(
+        fetchone_rows=[
+            None,
+            None,
+            _driver_row("ON_DELIVERY", driver_id="drv_demo_fallback"),
+            _assignment_row(order_id="order-fallback", driver_id="drv_demo_fallback"),
+            _driver_row("ON_DELIVERY", driver_id="drv_demo_fallback"),
+        ]
+    )
+    repository = _repository(cursor)
+
+    assignment, driver, created = repository.assign_driver("order-fallback")
+
+    assert created is True
+    assert assignment.order_id == "order-fallback"
+    assert assignment.driver_id == "drv_demo_fallback"
+    assert driver.driver_id == "drv_demo_fallback"
+    executed_sql = "\n".join(query for query, _ in cursor.executed)
+    assert "ON CONFLICT (id) DO UPDATE" in executed_sql
+    assert "INSERT INTO tracking_events" in executed_sql
+    assert "INSERT INTO driver_tracking_snapshots" in executed_sql
+
+
 def test_postgres_route_estimate_persists_geometry_and_tracking_snapshot() -> None:
     cursor = FakeCursor(
         fetchone_rows=[
@@ -148,9 +172,9 @@ def _repository(cursor: FakeCursor) -> PostgresDriverRepository:
     return repository
 
 
-def _driver_row(status: str) -> dict:
+def _driver_row(status: str, driver_id: str = "drv_demo_alex") -> dict:
     return {
-        "id": "drv_demo_alex",
+        "id": driver_id,
         "name": "Alex M.",
         "status": status,
         "current_lat": 52.52,
@@ -161,11 +185,15 @@ def _driver_row(status: str) -> dict:
     }
 
 
-def _assignment_row(status: str = "ASSIGNED") -> dict:
+def _assignment_row(
+    status: str = "ASSIGNED",
+    order_id: str = "order-db",
+    driver_id: str = "drv_demo_alex",
+) -> dict:
     return {
         "id": "asg-1",
-        "order_id": "order-db",
-        "driver_id": "drv_demo_alex",
+        "order_id": order_id,
+        "driver_id": driver_id,
         "status": status,
         "assigned_at": NOW,
         "picked_up_at": None,
