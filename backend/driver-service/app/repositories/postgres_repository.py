@@ -15,6 +15,7 @@ from app.models import (
     TrackingResponse,
     TrackingSnapshot,
 )
+from app.repositories.demo_data import DEMO_FALLBACK_DRIVER
 
 
 DRIVER_COLUMNS = """
@@ -91,6 +92,7 @@ class PostgresDriverRepository:
                 if existing is not None:
                     return existing, self._get_driver_with_cursor(cursor, existing.driver_id), False
 
+                allow_demo_fallback_reuse = False
                 if driver_id:
                     cursor.execute(
                         f"SELECT {DRIVER_COLUMNS} FROM drivers WHERE id = %s FOR UPDATE",
@@ -107,12 +109,14 @@ class PostgresDriverRepository:
                 if driver_row is None:
                     if driver_id:
                         raise NotFoundError("DRIVER_NOT_FOUND", "Driver could not be found.")
-                    raise NotFoundError(
-                        "NO_AVAILABLE_DRIVER", "No available driver could be found."
-                    )
+                    driver_row = self._get_or_create_demo_fallback_driver(cursor)
+                    allow_demo_fallback_reuse = True
 
                 driver = _driver_from_row(driver_row)
-                if driver.status != DriverStatus.AVAILABLE:
+                if (
+                    driver.status != DriverStatus.AVAILABLE
+                    and not allow_demo_fallback_reuse
+                ):
                     raise ConflictError(
                         "DRIVER_UNAVAILABLE", "Driver is not available for assignment."
                     )
@@ -172,6 +176,31 @@ class PostgresDriverRepository:
                 if existing is None:
                     raise
                 return existing, self._get_driver_with_cursor(cursor, existing.driver_id), False
+
+    def _get_or_create_demo_fallback_driver(self, cursor) -> dict:
+        driver_id, name, lat, lng = DEMO_FALLBACK_DRIVER
+        cursor.execute(
+            f"""INSERT INTO drivers
+                    (id, name, status, current_lat, current_lng, last_position_at)
+                VALUES (%s, %s, %s, %s, %s, now())
+                ON CONFLICT (id) DO UPDATE
+                SET name = EXCLUDED.name,
+                    status = %s,
+                    current_lat = EXCLUDED.current_lat,
+                    current_lng = EXCLUDED.current_lng,
+                    last_position_at = now(),
+                    updated_at = now()
+                RETURNING {DRIVER_COLUMNS}""",
+            (
+                driver_id,
+                name,
+                DriverStatus.ON_DELIVERY.value,
+                lat,
+                lng,
+                DriverStatus.ON_DELIVERY.value,
+            ),
+        )
+        return cursor.fetchone()
 
     def get_tracking(self, order_id: str) -> TrackingResponse:
         try:

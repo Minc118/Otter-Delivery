@@ -102,16 +102,52 @@ def test_duplicate_assignment_is_idempotent(client: TestClient) -> None:
     assert len(tracking["events"]) == 1
 
 
-def test_no_available_driver_error(
+def test_assign_uses_demo_fallback_when_no_available_driver_exists(
     client: TestClient, repository: MemoryDriverRepository
 ) -> None:
     for index in range(5):
         repository.assign_driver(f"occupy-{index}")
 
-    response = client.post("/drivers/assign", json={"orderId": "order-no-driver"})
+    response = client.post("/drivers/assign", json={"orderId": "order-fallback"})
 
-    assert response.status_code == 404
-    assert_error_shape(response, "NO_AVAILABLE_DRIVER")
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["assignment"]["orderId"] == "order-fallback"
+    assert payload["assignment"]["driverId"] == "drv_demo_fallback"
+    assert payload["driver"]["driverId"] == "drv_demo_fallback"
+    assert payload["driver"]["status"] == "ON_DELIVERY"
+
+
+def test_fallback_assignment_initializes_tracking(
+    client: TestClient, repository: MemoryDriverRepository
+) -> None:
+    for index in range(5):
+        repository.assign_driver(f"occupy-{index}")
+
+    client.post("/drivers/assign", json={"orderId": "order-fallback-tracking"})
+
+    response = client.get("/orders/order-fallback-tracking/tracking")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["orderId"] == "order-fallback-tracking"
+    assert payload["assignment"]["driverId"] == "drv_demo_fallback"
+    assert payload["events"][0]["eventType"] == "DRIVER_ASSIGNED"
+    assert payload["latestSnapshot"]["status"] == "ASSIGNED"
+
+
+def test_repeated_demo_orders_reuse_fallback_driver(
+    client: TestClient, repository: MemoryDriverRepository
+) -> None:
+    for index in range(5):
+        repository.assign_driver(f"occupy-{index}")
+
+    first = client.post("/drivers/assign", json={"orderId": "fallback-1"})
+    second = client.post("/drivers/assign", json={"orderId": "fallback-2"})
+
+    assert first.status_code == second.status_code == 201
+    assert first.json()["driver"]["driverId"] == "drv_demo_fallback"
+    assert second.json()["driver"]["driverId"] == "drv_demo_fallback"
 
 
 def test_tracking_response_has_frontend_shape(client: TestClient) -> None:

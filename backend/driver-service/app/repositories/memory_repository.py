@@ -15,15 +15,7 @@ from app.models import (
     TrackingResponse,
     TrackingSnapshot,
 )
-
-
-DEMO_DRIVERS = (
-    ("drv_demo_alex", "Alex M.", 52.5200, 13.4050),
-    ("drv_demo_sam", "Sam K.", 52.5180, 13.4090),
-    ("drv_demo_mina", "Mina L.", 52.5224, 13.4017),
-    ("drv_demo_noah", "Noah R.", 52.5157, 13.3901),
-    ("drv_demo_lina", "Lina S.", 52.5260, 13.4142),
-)
+from app.repositories.demo_data import DEMO_DRIVERS, DEMO_FALLBACK_DRIVER
 
 
 def utc_now() -> datetime:
@@ -115,10 +107,9 @@ class MemoryDriverRepository:
                     if driver.status == DriverStatus.AVAILABLE
                 ]
                 if not available:
-                    raise NotFoundError(
-                        "NO_AVAILABLE_DRIVER", "No available driver could be found."
-                    )
-                driver = min(available, key=lambda candidate: candidate.updated_at)
+                    driver = self._demo_fallback_driver()
+                else:
+                    driver = min(available, key=lambda candidate: candidate.updated_at)
 
             now = utc_now()
             assigned_driver = driver.model_copy(
@@ -171,6 +162,25 @@ class MemoryDriverRepository:
                 )
             ]
             return deepcopy(assignment), deepcopy(assigned_driver), True
+
+    def _demo_fallback_driver(self) -> Driver:
+        driver_id, name, lat, lng = DEMO_FALLBACK_DRIVER
+        existing = self._drivers.get(driver_id)
+        if existing is not None:
+            return existing
+
+        now = utc_now()
+        driver = Driver(
+            driver_id=driver_id,
+            name=name,
+            status=DriverStatus.AVAILABLE,
+            current_location=Location(lat=lat, lng=lng),
+            last_position_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        self._drivers[driver_id] = driver
+        return driver
 
     def get_tracking(self, order_id: str) -> TrackingResponse:
         with self._lock:
