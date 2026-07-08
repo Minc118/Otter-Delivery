@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { getDeliveryTiming } from "../../hooks/useDeliverySimulation.js";
 import { getTrackedDeliveryOrders } from "../../services/trackingState.js";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 
 const DELIVERY_BADGE_CLASS =
   "hidden md:flex items-center gap-2 rounded-full bg-surface-light px-4 py-2 font-metadata text-metadata";
@@ -17,6 +18,24 @@ export default function Navbar({
 }) {
   const location = useLocation();
   const [now, setNow] = useState(() => Date.now());
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const { language, setLanguage: setLang } = useLanguage();
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (!e.target.closest(".language-dropdown")) {
+        setLanguageOpen(false);
+      }
+    }
+
+    if (languageOpen) {
+      window.addEventListener("click", handleClickOutside);
+    }
+
+    return () => {
+      window.removeEventListener("click", handleClickOutside);
+    };
+  }, [languageOpen]);
   const trackedDeliveries = useMemo(
     () => getTrackedDeliveryOrders(trackedOrders),
     [trackedOrders],
@@ -68,6 +87,20 @@ export default function Navbar({
   const hasCartItems = cartItemCount > 0;
   const isProfileActive = location.pathname === "/profile";
   const profile = JSON.parse(localStorage.getItem("profile"));
+  const languages = [
+    { code: "BG", label: "Bulgarian" },
+    { code: "DE", label: "German" },
+    { code: "FR", label: "French" },
+    { code: "IT", label: "Italian" },
+    { code: "ZH", label: "Chinese" },
+    { code: "FA", label: "Persian" },
+    { code: "EN", label: "English" },
+  ];
+
+  function handleLanguageSelect(lang) {
+    setLang(lang);
+    setLanguageOpen(false);
+  }
   const navLinkClass = ({ isActive }) =>
     `font-body-md text-body-md transition-all duration-150 active:scale-95 ${
       isActive
@@ -167,13 +200,39 @@ export default function Navbar({
             </span>
           )}
           <div className="flex gap-4">
-            <button
-              aria-label="Change language"
-              className="text-on-surface-variant dark:text-surface-variant hover:text-primary transition-all duration-150 active:scale-95 p-2"
-              type="button"
-            >
-              <span className="material-symbols-outlined">language</span>
-            </button>
+            {/*<button*/}
+            {/*  aria-label="Change language"*/}
+            {/*  className="text-on-surface-variant dark:text-surface-variant hover:text-primary transition-all duration-150 active:scale-95 p-2"*/}
+            {/*  type="button"*/}
+            {/*>*/}
+            {/*  <span className="material-symbols-outlined">language</span>*/}
+            {/*</button>*/}
+            <div className="relative language-dropdown">
+              <button
+                  aria-label="Change language"
+                  className="text-on-surface-variant dark:text-surface-variant hover:text-primary transition-all duration-150 active:scale-95 p-2"
+                  type="button"
+                  onClick={() => setLanguageOpen((prev) => !prev)}
+              >
+                <span className="material-symbols-outlined">language</span>
+              </button>
+
+              {languageOpen && (
+                  <div className="absolute right-0 mt-2 w-44 bg-surface-container shadow-lg rounded-md border border-surface-variant z-50">
+                    {languages.map((lang) => (
+                        <button
+                            key={lang.code}
+                            onClick={() => handleLanguageSelect(lang.code)}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-surface ${
+                                language === lang.code ? "text-primary font-semibold" : ""
+                            }`}
+                        >
+                          {lang.label}
+                        </button>
+                    ))}
+                  </div>
+              )}
+            </div>
             <button
               aria-label="Open cart"
               className={`relative transition-all duration-150 active:scale-95 p-2 ${

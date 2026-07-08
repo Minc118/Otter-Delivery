@@ -15,12 +15,15 @@ services:
       VITE_PROFILE_SERVICE_URL: http://localhost:${PROFILE_SERVICE_PORT:-8006}
       VITE_RECOMMENDATION_API_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
       VITE_RECOMMENDATION_SERVICE_URL: http://localhost:${RECOMMENDATION_SERVICE_PORT:-8004}
+      VITE_TRANSLATION_SERVICE_URL: http://localhost:${TRANSLATION_SERVICE_PORT:-8005}
     depends_on:
       - restaurant-service
       - order-service
       - profile-service
       - driver-service
       - recommendation-service
+      - translation-service
+
 
   restaurant-service:
     platform: linux/amd64
@@ -32,6 +35,10 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SEED_DEMO_DATA: "true"
       SERVER_PORT: 8001
+      RESTAURANT_DATABASE_URL: ${RESTAURANT_DATABASE_URL}
+      RESTAURANT_DATABASE_USERNAME: ${RESTAURANT_DATABASE_USERNAME}
+      RESTAURANT_DATABASE_PASSWORD: ${RESTAURANT_DATABASE_PASSWORD}
+
 
   order-service:
     build:
@@ -40,10 +47,11 @@ services:
       - "${ORDER_SERVICE_PORT:-8002}:8002"
     environment:
       SERVER_PORT: 8002
-      ORDER_DATABASE_URL: ${ORDER_DATABASE_URL:-jdbc:h2:mem:orders;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
-      ORDER_DATABASE_USERNAME: ${ORDER_DATABASE_USERNAME:-sa}
-      ORDER_DATABASE_PASSWORD: ${ORDER_DATABASE_PASSWORD:-}
       RESTAURANT_SERVICE_URL: http://restaurant-service:8001
+      # Added isolated database credentials for the Order Service
+      ORDER_DATABASE_URL: ${ORDER_DATABASE_URL}
+      ORDER_DATABASE_USERNAME: ${ORDER_DATABASE_USERNAME}
+      ORDER_DATABASE_PASSWORD: ${ORDER_DATABASE_PASSWORD}
     depends_on:
       - restaurant-service
 
@@ -107,11 +115,6 @@ services:
     depends_on:
       - restaurant-service
 
-  # Placeholder teammate services, not implemented yet:
-  # auth-service:
-  #   image: quay.io/keycloak/keycloak:latest
-  #   ports:
-  #     - "8080:8080"
 
 volumes:
   frontend_node_modules:
