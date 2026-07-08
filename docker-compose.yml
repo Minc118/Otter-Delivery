@@ -108,7 +108,7 @@ services:
     ports:
       - "${TRANSLATION_SERVICE_PORT:-8005}:8005"
     environment:
-      SERVER_PORT: 8005
+      PORT: 8005
       RESTAURANT_SERVICE_BASE_URL: http://restaurant-service:8001/api
       DEEPL_API_KEY: ${DEEPL_API_KEY:-}
       DEEPL_BASE_URL: ${DEEPL_BASE_URL:-https://api-free.deepl.com/v2/translate}
