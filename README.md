@@ -10,6 +10,8 @@ https://otter-delivery.vercel.app
 
 The frontend is deployed on Vercel and communicates with backend services deployed on Google Cloud Run.
 
+To test the login and user-specific features, please use one of the demo usernames: max or sohrab.
+
 ## What We Are Most Proud Of
 
 What we are most proud of is the way the project developed from a product idea into a usable microservice-based application.
