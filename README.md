@@ -10,7 +10,7 @@ https://otter-delivery.vercel.app
 
 The frontend is deployed on Vercel and communicates with backend services deployed on Google Cloud Run.
 
-To test the login and user-specific features, please use one of the demo usernames: **sohrab**.
+To test the login and user-specific features, please use the demo usernames: **sohrab**.
 
 ## What We Are Most Proud Of
 
